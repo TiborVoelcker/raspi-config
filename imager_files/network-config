@@ -4,7 +4,7 @@ network:
     eth0:
       dhcp4: true
       dhcp6: true
-      optional: true
+      optional: false
   wifis:
     wlan0:
       dhcp4: true
@@ -12,4 +12,4 @@ network:
       access-points:
         "<WIFI_SSID>":
           password: "<WIFI_PWD>"  # create with `wpa_passphrase "<WIFI_SSID>" "<WIFI_PWD>"`
-      optional: true
+      optional: false
