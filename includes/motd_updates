@@ -1,0 +1,15 @@
+#!/bin/bash
+UPGRADABLE=$(apt list --upgradable 2>/dev/null | grep -v Listing | cut -d/ -f1)
+COUNT=$(echo "$UPGRADABLE" | grep -c '.')
+
+if [ "$COUNT" -eq 0 ]; then
+  echo "✅ All packages are up to date."
+else
+  echo "⚠ $COUNT packages can be upgraded:"
+  echo "  $(echo "$UPGRADABLE" | head -n 10 | tr '\n' ' ')"
+  if [ "$COUNT" -gt 10 ]; then
+      echo "  …and $((COUNT - 10)) more"
+  fi
+  echo "Run 'sudo apt upgrade' to update."
+fi
+echo ""

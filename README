@@ -1,0 +1,10 @@
+# Rasbperry Pi Provisioning
+
+This repository holds configuration files for my Raspberry Pi, which is configured on first boot by [cloud-init](https://cloud-init.io/).
+
+
+## Usage
+
+Write an image with the Raspberry Pi Imager. Customize the image as always. Make sure to setup an internet connection (ethernet or wifi).
+
+When written, go to the boot partition on the SD card. Rename `boot/firmware/user-data` to `boot/firmware/base.yaml`. Copy the `user-data` from this repository into `boot/firmware/`. Then open `boot/firmware/network-config` and set `optional` to `false`.
