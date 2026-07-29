@@ -1,3 +1,15 @@
+# Stub for the device-specific base module.
+#
+# This is NOT fetched from GitHub - it stays local to each SD card
+# (included via `file:///boot/firmware/modules/base.yaml`) because it
+# carries the user account, password hash and SSH key for that specific
+# Pi. Never commit a filled-in version of this file.
+#
+# The easiest way to get one: use the Raspberry Pi Imager's OS
+# customization options (hostname, user, SSH key, locale, timezone) when
+# writing the SD card, then copy its generated `user-data` here and rename
+# it to `base.yaml` (see README). The placeholders below show roughly what
+# that output looks like, in case you want to write it by hand instead.
 #cloud-config
 manage_resolv_conf: false
 hostname: raspberrypi  # set hostname
@@ -15,8 +27,8 @@ keyboard:
   model: pc105  # standard 105-key PC keyboard
   layout: "de"
 users:
-- name: tibor
-  gecos: Tibor Völcker
+- name: pi  # replace with your username
+  gecos: Pi User
   groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
   shell: /bin/bash
   lock_passwd: false
@@ -31,7 +43,5 @@ rpi:
   interfaces:
     serial: true
 package_update: true  # Update packages on first boot (`apt update`)
-package_upgrade: true  # Upgrade the instance on first boot  (`apt upgrade`)
+package_upgrade: true  # Upgrade the instance on first boot (`apt upgrade`)
 package_reboot_if_required: true  # Reboot after package installation
-#packages:
-#  - ...
