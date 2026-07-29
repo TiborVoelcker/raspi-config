@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Snapshot the live system onto the rescue partitions. Runs live, no reboot.
+# This is what defines your clean slate - run it whenever the current state is
+# one you would be happy to return to.
+set -euo pipefail
+REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+source "$REPO_DIR/lib/common.sh"
+
+need_root
+detect_disk
+[[ "$(current_role)" == "main" ]] || die "run this from the live system, not the rescue clone"
+
+echo "This overwrites the rescue system with the CURRENT state of this one."
+confirm "Continue?" || exit 1
+
+STOPPED=()
+if command -v docker >/dev/null && systemctl is-active --quiet docker; then
+    log "stopping compose stacks for a consistent copy"
+    while read -r cfg; do
+        [[ -n "$cfg" ]] || continue
+        (cd "$(dirname "$cfg")" && docker compose stop) || true
+        STOPPED+=("$cfg")
+    done < <(find /opt -maxdepth 2 -name 'docker-compose.y*ml' 2>/dev/null)
+fi
+restart_stacks() {
+    for cfg in "${STOPPED[@]:-}"; do
+        [[ -n "$cfg" ]] || continue
+        (cd "$(dirname "$cfg")" && docker compose start) || true
+    done
+}
+trap restart_stacks EXIT
+
+mkdir -p "$RESCUE_ROOT_MNT" "$RESCUE_BOOT_MNT"
+mountpoint -q "$RESCUE_ROOT_MNT" || mount "$DEV_ROOT_B" "$RESCUE_ROOT_MNT"
+mountpoint -q "$RESCUE_BOOT_MNT" || mount "$DEV_BOOT_B" "$RESCUE_BOOT_MNT"
+
+log "syncing rootfs"
+rsync -aAXH --delete --info=progress2 "${RSYNC_EXCLUDES[@]}" / "$RESCUE_ROOT_MNT/"
+
+log "syncing boot partition"
+rsync -a --delete --exclude=autoboot.txt --exclude=homelab-restore.arm \
+    --exclude=homelab-restore.log \
+    "$BOOT_DIR/" "$RESCUE_BOOT_MNT/"
+set_cmdline_root "$RESCUE_BOOT_MNT/cmdline.txt" "$PART_ROOT_B"
+
+retarget_fstab "$RESCUE_ROOT_MNT/etc/fstab" "$PART_BOOT_B" "$PART_ROOT_B"
+sed -i "\|[[:space:]]${DATA_DIR}[[:space:]]|d" "$RESCUE_ROOT_MNT/etc/fstab"
+
+echo rescue > "$RESCUE_ROOT_MNT/etc/homelab-role"
+echo "rescue-$(hostname)" > "$RESCUE_ROOT_MNT/etc/hostname"
+ln -sf /dev/null "$RESCUE_ROOT_MNT/etc/systemd/system/docker.service"
+ln -sf /dev/null "$RESCUE_ROOT_MNT/etc/systemd/system/docker.socket"
+
+install -Dm755 "$REPO_DIR/rescue/restore.sh" "$RESCUE_ROOT_MNT/usr/local/sbin/homelab-restore"
+install -Dm644 "$REPO_DIR/rescue/homelab-restore.service" "$RESCUE_ROOT_MNT/etc/systemd/system/homelab-restore.service"
+mkdir -p "$RESCUE_ROOT_MNT/etc/systemd/system/multi-user.target.wants"
+ln -sfn /etc/systemd/system/homelab-restore.service \
+    "$RESCUE_ROOT_MNT/etc/systemd/system/multi-user.target.wants/homelab-restore.service"
+
+date -Is > "$RESCUE_ROOT_MNT/etc/homelab-checkpoint"
+sync
+umount "$RESCUE_BOOT_MNT"
+umount "$RESCUE_ROOT_MNT"
+ok "checkpoint written $(date -Is)"
