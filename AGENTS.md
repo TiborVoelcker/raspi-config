@@ -26,6 +26,17 @@ Two ideas make that possible:
 Service state (Paperless documents, database files, etc.) lives on a
 **separate external disk**, not on the SD card, so a reset never touches it.
 
+Provisioning is deliberately two-phase: `modules/` (storage, data disk,
+rescue system) always runs; `services/` (Paperless etc.) only runs when
+asked for with `install.sh --services`. That's what makes the rescue
+system's first snapshot trustworthy as a fail-safe - it's a plain,
+service-free base, taken before any service ever ran, not a snapshot of
+whatever happened to be installed at checkpoint time. Since there's no
+uninstall path for a service (see "Things to watch for" below), that
+pre-services checkpoint is also the only reliable way to get all the way
+back to zero if a service turns out broken or you decide you don't want it
+anymore.
+
 ## How it's wired together
 
 ### Partition layout (MBR, four primaries, no extended container)
@@ -74,9 +85,10 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
 
 ### Repo layout
 
-- `install.sh` - entry point. Runs every `modules/*.sh` in lexicographic
-  order (hence the numeric prefixes: disk/storage modules first, service
-  modules after), then symlinks everything in `bin/` into `/usr/local/sbin`.
+- `install.sh` - entry point. Always runs every `modules/*.sh` in
+  lexicographic order (hence the numeric prefixes). Only runs
+  `services/*.sh` when called as `install.sh --services`. Either way, it
+  finishes by symlinking everything in `bin/` into `/usr/local/sbin`.
 - `lib/common.sh` - sourced by `install.sh` and every module. Output helpers
   (`log`/`ok`/`skip`/`warn`/`die`), guards (`need_root`, `need_cmd`,
   `need_tryboot_support`), the partition-layout constants, `detect_disk`,
@@ -92,11 +104,12 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
   the live boot+root onto `p3`/`p4`, retargets the clone's `fstab`/`cmdline`
   to its own partitions, marks its role as `rescue`, masks Docker there, and
   installs the restore service. Also writes `autoboot.txt`.
-- `modules/20-paperless.sh` - the only service module so far, and the
+- `services/20-paperless.sh` - the only service module so far, and the
   template for future ones: state on `/data` (survives a reset), config
   fetched from upstream once, secrets generated once (never regenerated -
   that would orphan existing data), `docker compose up -d` left unguarded
-  since Compose already reconciles state.
+  since Compose already reconciles state. Lives in `services/`, not
+  `modules/`, specifically so `install.sh` never runs it unless asked.
 - `bin/homelab-checkpoint` - re-syncs the live system onto the rescue
   partitions. Run this whenever the current state is one you'd be happy to
   return to; it's what a reset actually restores.
@@ -120,7 +133,8 @@ Implemented and (structurally) reviewed:
 
 - [x] `install.sh` + `lib/common.sh`
 - [x] `modules/00-storage.sh`, `01-data.sh`, `05-rescue.sh`
-- [x] `modules/20-paperless.sh` as the service-module template
+- [x] two-phase `install.sh` / `install.sh --services` split
+- [x] `services/20-paperless.sh` as the service-module template
 - [x] `bin/homelab-checkpoint`
 - [x] `rescue/restore.sh`
 - [x] `rescue/homelab-restore.service` (authored by me, needs a real look)
@@ -141,8 +155,15 @@ that means in practice today.
 
 ## Things to watch for when extending this
 
-- Any new service module should follow `20-paperless.sh`'s shape: state on
-  `/data`, everything else treated as disposable by a reset.
+- Any new service module goes in `services/`, not `modules/` - that's the
+  line between "always applied" and "applied when I say so." Follow
+  `20-paperless.sh`'s shape: state on `/data`, everything else treated as
+  disposable by a reset.
+- There is no uninstall path. Deleting a service's file from `services/`,
+  or editing it, does not undo whatever it already did to the live system
+  (packages, `/opt` files, running containers) - convergent provisioning
+  only ever adds. The only reliable way to fully remove a service today is
+  restoring to a checkpoint that predates it.
 - Anything that writes to *both* the live and rescue systems (like the
   restore-service install step) should stay duplicated between
   `05-rescue.sh` and `homelab-checkpoint` rather than factored into a shared

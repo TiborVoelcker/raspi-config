@@ -6,8 +6,9 @@ SD card space that can restore the live system at any time, no other computer
 required. Service data lives on a separate external disk, so a reset never
 touches it.
 
-Roughly: `install.sh` runs small idempotent modules to set up storage, the
-rescue partitions and each service; `homelab-checkpoint` snapshots the live
+Roughly: `install.sh` sets up storage, the data disk and the rescue
+partitions first, on their own; only once that plain baseline is checkpointed
+do services get layered on top. `homelab-checkpoint` snapshots the live
 system onto the rescue partitions whenever you're happy with its state; a
 reboot into the rescue system can then restore from that snapshot.
 

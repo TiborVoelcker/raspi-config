@@ -66,8 +66,26 @@ cd ~/raspi-homelab
 sudo ./install.sh
 ```
 
-Re-run any time. Every module no-ops where its work is already done, so
-adding a module and re-running only does the new work.
+This only runs `modules/` (storage, data disk, rescue system) - it does
+**not** touch `services/`. That's deliberate: it leaves you with a plain,
+service-free system whose first rescue snapshot (taken right here, by
+`modules/05-rescue.sh`) is a genuine fail-safe, not a copy of whatever
+services happened to be installed at the time. Take the chance to update and
+poke at the system, then lock that baseline in:
+
+```bash
+sudo apt update && sudo apt upgrade
+sudo homelab-checkpoint
+```
+
+Only once you're happy with that baseline, layer services on top:
+
+```bash
+sudo ./install.sh --services
+```
+
+Re-run either form any time - every module and service no-ops where its work
+is already done, so adding one and re-running only does the new work.
 
 Note: `install.sh`'s closing banner mentions `homelab-status` and
 `homelab-reset` - those commands don't exist yet (see `AGENTS.md`). Only
@@ -115,6 +133,12 @@ machine. Drift there quietly redefines what a reset restores to.
 the reset scope and gets rolled back. The pattern in `20-paperless.sh` shows
 the split: config in `/opt`, state in `/data`.
 
+**There's no uninstall.** Removing or editing a file in `services/` doesn't
+undo what it already did to the live system. If a service turns out broken,
+or you just don't want it anymore, restoring the pre-services checkpoint
+(the one you made right after `install.sh`, before ever running
+`--services`) is the only sure way back to zero.
+
 **Keep one physical spare.** This protects against a broken system, not dead
 hardware. A second SD card with a known-good image in a drawer is the actual
 disaster recovery answer.
@@ -127,13 +151,17 @@ hand. For now:
 
 1. `sudo ./install.sh` on a freshly-imaged, not-yet-auto-expanded card.
    Eyeball the result yourself (`lsblk`, `findmnt /data`, `systemctl status
-   docker`) - there's no `homelab-status` yet to do this for you.
+   docker`) - there's no `homelab-status` yet to do this for you. Confirm
+   nothing under `services/` ran (e.g. no Paperless containers, no
+   `/opt/paperless`).
 2. `sudo homelab-checkpoint`. Confirm it completes, and that the rescue
    partitions (`p3`/`p4`) now hold a copy of the system (mount them
-   read-only and look, or trust the "checkpoint written" timestamp).
+   read-only and look, or trust the "checkpoint written" timestamp). This
+   is your service-free fail-safe - worth confirming it really is one.
 3. Plain `sudo reboot` - confirm you land back on the live system
    automatically. This proves the tryboot fail-safe (an ordinary reboot
    never lands on rescue) independent of anything specific to this repo.
+4. Only then: `sudo ./install.sh --services`, confirm the service(s) come up.
 
 Don't attempt a real restore round trip yet - that needs
 `homelab-rescue-shell`/`homelab-reset` (or manually arming + triggering
@@ -141,7 +169,7 @@ tryboot) and hasn't been exercised end-to-end.
 
 ## Adding a service
 
-Copy `modules/20-paperless.sh`:
+Copy `services/20-paperless.sh`:
 
 - directories on `/data` so a reset preserves them
 - upstream config fetched once, guarded by a file test
