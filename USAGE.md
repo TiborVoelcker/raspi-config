@@ -69,23 +69,24 @@ sudo ./install.sh
 Re-run any time. Every module no-ops where its work is already done, so
 adding a module and re-running only does the new work.
 
-Note: `install.sh`'s closing banner mentions `homelab-status` and
-`homelab-reset` - those commands don't exist yet (see `AGENTS.md`). Only
-`homelab-checkpoint` is currently installed into `/usr/local/sbin`.
-
-## Day to day (today)
+## Day to day
 
 ```bash
+sudo homelab-status          # partitions, data disk, checkpoint age, armed?
 sudo homelab-checkpoint      # snapshot live -> rescue. live, no reboot
+sudo homelab-reset           # wipe live, restore from last checkpoint
 ```
 
 Checkpointing runs live because the rescue partitions aren't in use while
 you're on the live system. Restoring needs a reboot into rescue, because you
 can't overwrite the filesystem you're currently running from - that
-asymmetry is inherent, not a design choice.
+asymmetry is inherent, not a design choice. `homelab-reset` shows you the
+checkpoint's timestamp and asks for confirmation before it arms anything -
+read that timestamp, it's the only preview you get of what you're about to
+lose.
 
-`homelab-status`, `homelab-reset`, and `homelab-rescue-shell` are planned but
-not written yet - see `AGENTS.md` for the current status.
+`homelab-rescue-shell` (boot into rescue *without* committing to a restore,
+just to look around) is still planned but not written - see `AGENTS.md`.
 
 ### Safety gates on restore
 
@@ -97,14 +98,17 @@ not written yet - see `AGENTS.md` for the current status.
 2. this boot came via tryboot - it was deliberate
 3. the arm marker exists on bootB - a restore was actually requested
 
-Gate 3 is why a future `homelab-rescue-shell` would be safe: it would clear
-the marker, so you can inspect the rescue system without it overwriting the
-live one on its next boot.
+`homelab-reset` is what sets up all three: it triggers the tryboot itself
+(gate 2) after arming the marker (gate 3), and the rescue system already
+carries the `rescue` role from when it was cloned (gate 1). Gate 3 is why a
+future `homelab-rescue-shell` would be safe: it would boot into rescue
+*without* arming, so you could inspect it without risking an overwrite on
+its next boot.
 
 Note that the marker lives on **bootB**, not bootA. Each system mounts its
 own boot partition, so a marker on bootA would be invisible to the rescue
-system. `arm_restore()` in `lib/common.sh` mounts bootB explicitly to place
-it - there's just no command wired up to call it yet.
+system. `arm_restore()` in `lib/common.sh` (called by `homelab-reset`)
+mounts bootB explicitly to place it.
 
 ## Things to keep in mind
 
@@ -119,25 +123,26 @@ the split: config in `/opt`, state in `/data`.
 hardware. A second SD card with a known-good image in a drawer is the actual
 disaster recovery answer.
 
-## Test order (current scope: initial setup + checkpoint only)
+## Test order
 
-The reset/rescue-shell round trip can't be fully exercised yet since those
-commands don't exist - `arm_restore`/tryboot would have to be triggered by
-hand. For now:
+Do all of this before trusting it with anything:
 
 1. `sudo ./install.sh` on a freshly-imaged, not-yet-auto-expanded card.
-   Eyeball the result yourself (`lsblk`, `findmnt /data`, `systemctl status
-   docker`) - there's no `homelab-status` yet to do this for you.
-2. `sudo homelab-checkpoint`. Confirm it completes, and that the rescue
-   partitions (`p3`/`p4`) now hold a copy of the system (mount them
-   read-only and look, or trust the "checkpoint written" timestamp).
+   Check `homelab-status` looks sane.
+2. `sudo homelab-checkpoint`.
 3. Plain `sudo reboot` - confirm you land back on the live system
    automatically. This proves the tryboot fail-safe (an ordinary reboot
    never lands on rescue) independent of anything specific to this repo.
+4. Only then: make a throwaway change (touch a file, install a package),
+   `sudo homelab-reset`, confirm it reboots, restores, and reboots back -
+   and that the throwaway change is gone while `/data` survived.
 
-Don't attempt a real restore round trip yet - that needs
-`homelab-rescue-shell`/`homelab-reset` (or manually arming + triggering
-tryboot) and hasn't been exercised end-to-end.
+Step 3 proves the fail-safe. Don't skip to step 4.
+
+There's no `homelab-rescue-shell` yet to poke around the rescue system
+*without* committing to a restore - right now, booting into rescue means a
+restore either happens (if armed) or it doesn't (if not), nothing in
+between beyond a normal shell.
 
 ## Adding a service
 

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+source "$REPO_DIR/lib/common.sh"
+detect_disk
+
+echo "role            $(current_role)"
+echo "booted tryboot  $(booted_via_tryboot && echo yes || echo no)"
+echo "sd card         $DISK"
+echo
+lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT "$DISK"
+echo
+if mountpoint -q "$DATA_DIR"; then
+    echo "data            $(findmnt -no SOURCE,SIZE,USE% "$DATA_DIR")"
+    [[ -f "$DATA_MARKER" ]] || warn "data marker MISSING - wrong disk mounted?"
+else
+    warn "data disk NOT mounted - docker will refuse to start"
+fi
+echo
+if [[ -b "$DEV_ROOT_B" ]]; then
+    mkdir -p "$RESCUE_ROOT_MNT"
+    if mount -o ro "$DEV_ROOT_B" "$RESCUE_ROOT_MNT" 2>/dev/null; then
+        echo "checkpoint      $(cat "$RESCUE_ROOT_MNT/etc/homelab-checkpoint" 2>/dev/null || echo 'none recorded')"
+        umount "$RESCUE_ROOT_MNT"
+    fi
+else
+    echo "checkpoint      no rescue partition"
+fi
+restore_armed && warn "RESTORE ARMED - next tryboot will wipe the live system"
+exit 0

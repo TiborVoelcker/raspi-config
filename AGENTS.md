@@ -100,6 +100,14 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
 - `bin/homelab-checkpoint` - re-syncs the live system onto the rescue
   partitions. Run this whenever the current state is one you'd be happy to
   return to; it's what a reset actually restores.
+- `bin/homelab-reset` - shows the last checkpoint's timestamp, confirms,
+  arms the restore (`arm_restore` in `lib/common.sh`), and triggers an
+  immediate tryboot (`reboot "0 tryboot"`). Everything past that point
+  happens inside the rescue system via `rescue/homelab-restore.service`.
+- `bin/homelab-status` - read-mostly snapshot of where things stand: role,
+  whether this boot was a tryboot, partition table, whether `/data` is
+  mounted (and carries its marker), the rescue partition's last checkpoint
+  timestamp, and whether a restore is currently armed.
 - `rescue/restore.sh` - installed into the rescue system as
   `/usr/local/sbin/homelab-restore`. Runs on every rescue boot but is gated
   three ways, all of which must hold: role is `rescue`, this boot was a real
@@ -122,22 +130,22 @@ Implemented and (structurally) reviewed:
 - [x] `modules/00-storage.sh`, `01-data.sh`, `05-rescue.sh`
 - [x] `modules/20-paperless.sh` as the service-module template
 - [x] `bin/homelab-checkpoint`
+- [x] `bin/homelab-reset`
+- [x] `bin/homelab-status`
 - [x] `rescue/restore.sh`
 - [x] `rescue/homelab-restore.service` (authored by me, needs a real look)
 
-Deliberately not built yet - `install.sh`'s closing banner mentions
-`homelab-reset` and `homelab-status`, but neither exists yet:
+Deliberately not built yet:
 
-- [ ] `bin/homelab-status` - inspect partitions/checkpoint age/data disk state
-- [ ] `bin/homelab-reset` - the friendly wrapper around arming a restore and
-      rebooting via tryboot (right now that would have to be done by hand)
 - [ ] `bin/homelab-rescue-shell` - boot into rescue *without* arming a
-      restore, to look around safely
+      restore, to look around safely. Without it, the only way to inspect
+      the rescue system today is `homelab-reset` itself (which commits to
+      an actual restore) or booting it by hand and clearing the arm marker
+      yourself.
 
-Current scope is deliberately narrow: get `install.sh` (initial setup) and
-`homelab-checkpoint` working and testable first, before building the
-reset/status/rescue-shell UX on top. See `USAGE.md`'s "Test order" for what
-that means in practice today.
+`install.sh`'s closing banner (`homelab-checkpoint`/`homelab-reset`/
+`homelab-status`) is now fully accurate. The full checkpoint -> reset round
+trip can be exercised end-to-end; see `USAGE.md`'s "Test order".
 
 ## Things to watch for when extending this
 
