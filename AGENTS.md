@@ -92,6 +92,13 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
   the live boot+root onto `p3`/`p4`, retargets the clone's `fstab`/`cmdline`
   to its own partitions, marks its role as `rescue`, masks Docker there, and
   installs the restore service. Also writes `autoboot.txt`.
+- `modules/11-docker.sh` - installs Docker Engine + the Compose plugin from
+  Debian's own repos (`docker.io`, `docker-compose-v2`). Numbered well after
+  `05-rescue.sh` on purpose: the rescue system's one-time initial clone
+  happens before this module ever runs, so - like `services/` - Docker never
+  ends up on the fail-safe baseline. `01-data.sh`'s systemd drop-in for
+  `docker.service` is written before Docker even exists on disk; that's
+  fine, systemd drop-ins apply whenever the base unit shows up later.
 - `modules/20-paperless.sh` - the only service module so far, and the
   template for future ones: state on `/data` (survives a reset), config
   fetched from upstream once, secrets generated once (never regenerated -
@@ -127,7 +134,7 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
 Implemented and (structurally) reviewed:
 
 - [x] `install.sh` + `lib/common.sh`
-- [x] `modules/00-storage.sh`, `01-data.sh`, `05-rescue.sh`
+- [x] `modules/00-storage.sh`, `01-data.sh`, `05-rescue.sh`, `11-docker.sh`
 - [x] `modules/20-paperless.sh` as the service-module template
 - [x] `bin/homelab-checkpoint`
 - [x] `bin/homelab-reset`
