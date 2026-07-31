@@ -78,9 +78,7 @@ sudo homelab-status          # partitions, data disk, baseline age, armed?
 sudo homelab-reset           # wipe live, restore the pristine baseline
 ```
 
-There is no checkpoint command, and that is the point. The baseline is captured
-once and never refreshed, so there is only ever one thing a reset can restore
-to: the flashed image. Recovery is always the same two steps.
+Recovery is always the same two steps:
 
 ```bash
 sudo homelab-reset           # reboots twice, lands on the pristine system
@@ -90,16 +88,34 @@ sudo ./install.sh            # rebuilds the homelab on top
 `homelab-reset` shows when the baseline was captured and asks for confirmation
 before it arms anything. It refuses outright if there is no baseline.
 
-After a reset, `02-data.sh` will ask you to pick the data disk again, exactly
-as it did the first time - the restored system has no `/data` fstab entry,
-just like a freshly flashed card. Set `HOMELAB_DATA_UUID` to skip the prompt:
+After a reset, `02-data.sh` asks you to pick the data disk again - the restored
+system has no `/data` fstab entry, just like a freshly flashed card. Your
+documents are untouched on the disk; only the fstab line is rebuilt. Set
+`HOMELAB_DATA_UUID` to skip the prompt:
 
 ```bash
 sudo HOMELAB_DATA_UUID=<uuid> ./install.sh
 ```
 
-Your documents are untouched on the disk either way; only the fstab line is
-rebuilt.
+### Recapturing the baseline
+
+Normally you never do this. But the baseline is never apt-upgraded, so after a
+Debian major release upgrade it can be old enough that its apt sources no
+longer resolve - at which point a reset lands you somewhere `install.sh` cannot
+build on.
+
+To recapture, delete the stamp and re-run on a system you would be happy to
+start from:
+
+```bash
+sudo mount /dev/mmcblk0p4 /mnt
+sudo rm /mnt/etc/homelab-baseline /mnt/etc/homelab-role
+sudo umount /mnt
+sudo ./install.sh
+```
+
+Whatever is on the live system at that moment becomes the new baseline, so do
+it from a system that is as close to freshly-flashed as you can manage.
 
 ### Safety gates on restore
 
@@ -124,10 +140,9 @@ retrying:
 sudo mount /dev/mmcblk0p3 /mnt && sudo rm /mnt/homelab-restore.arm && sudo umount /mnt
 ```
 
-## Working on the baseline
+## Looking at the baseline
 
-You should not need to. If you do, mount it from the live system rather than
-booting it:
+Mount it from the live system rather than booting it:
 
 ```bash
 sudo mount /dev/mmcblk0p4 /mnt      # rootB
@@ -135,10 +150,10 @@ sudo mount /dev/mmcblk0p3 /mnt/boot/firmware
 ```
 
 Booting it directly is safe - without an arm marker the restore service exits
-immediately - but there is nothing there worth logging into.
+immediately.
 
-The restore log from the last reset is on bootB as `homelab-restore.log`, which
-is the first place to look if a reset did not do what you expected.
+The restore log from the last reset is on bootB as `homelab-restore.log`, the
+first place to look if a reset did not do what you expected.
 
 ## Things to keep in mind
 
@@ -146,9 +161,9 @@ is the first place to look if a reset did not do what you expected.
 the reset scope and gets rolled back. `20-paperless.sh` shows the split: config
 in `/opt`, state in `/data`.
 
-**A reset is not a rollback to yesterday.** It goes all the way back to the
-flashed image. If you want "the state I had last Tuesday", this is the wrong
-tool - back up `/data` and keep your changes in `install.sh`.
+**A reset goes all the way back to the flashed image**, not to yesterday. If
+you want "the state I had last Tuesday", this is the wrong tool - back up
+`/data` and keep your changes in `install.sh`.
 
 **Keep one physical spare.** This protects against a broken system, not dead
 hardware. A second SD card with a known-good image in a drawer is the actual

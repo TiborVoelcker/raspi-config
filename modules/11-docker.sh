@@ -3,8 +3,7 @@
 # third-party apt source or curl-pipe-to-shell needed. Raspberry Pi OS
 # (Debian bookworm) ships packages recent enough for homelab use.
 #
-# Like every module after 01-rescue.sh, this never reaches the baseline: the
-# baseline is captured before Docker is installed and is never refreshed, so a
+# Like everything after 01-rescue.sh, this never reaches the baseline, so a
 # reset removes Docker entirely and the next install.sh puts it back.
 set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"

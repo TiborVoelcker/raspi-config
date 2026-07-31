@@ -1,8 +1,9 @@
 # raspi-homelab
 
 Convergent, script-driven provisioning for my Raspberry Pi homelab, plus a
-self-hosted "reset button": a pristine copy of the flashed OS lives on spare SD
-card space and can be put back at any time, no other computer required. Service
+self-hosted "reset button": re-image the card without taking it out of the Pi.
+A pristine copy of the flashed OS lives on spare SD card space and can be put
+back at any time - no second computer, no card reader, just a reboot. Service
 data lives on a separate external disk, so a reset never touches it.
 
 `install.sh` is the single source of truth for what this Pi should look like.

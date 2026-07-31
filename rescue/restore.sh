@@ -12,11 +12,10 @@
 # Gate 3 is what makes booting bootB by hand safe: with no marker this exits
 # before touching anything.
 #
-# There is very little to undo on the way back, because the baseline is a
-# pristine clone rather than a customised system. Only three things differ from
-# what rootA should hold: the partitions its fstab and cmdline point at, the
-# role file, and this restore machinery. Anything added to 01-rescue.sh needs
-# its inverse here.
+# Only three things here differ from what rootA should hold: the partitions its
+# fstab and cmdline point at, the role file, and this restore machinery. Those
+# are what gets undone below, and anything added to 01-rescue.sh needs its
+# inverse here.
 #
 # The external data disk is never mounted here at all.
 set -euo pipefail

@@ -14,7 +14,7 @@ physical access beyond a reboot.
 
 The design rests on one decision: **`install.sh` is the only thing that defines
 the desired state.** Everything it builds is disposable, because it can be
-rebuilt. That makes the recovery story a single path rather than a matrix:
+rebuilt. So recovery is one path, whatever went wrong:
 
 ```
 bad state -> homelab-reset -> pristine baseline -> install.sh -> working homelab
@@ -37,28 +37,24 @@ Two mechanisms make it work:
 Service state (Paperless documents, databases) lives on a **separate external
 disk**, so a reset never touches it.
 
-## What the baseline is, and is not
+## The baseline
 
-It is a copy of the system **exactly as it came off the SD card image**,
-captured once by `01-rescue.sh` before any other module runs, then left alone
-forever. No `/data` mount, no apt upgrade, no Docker, no services.
+A copy of the system **exactly as it came off the SD card image**, captured
+once by `01-rescue.sh` before any other module runs, then left alone. No
+`/data` mount, no apt upgrade, no Docker, no services. Because it is never
+refreshed it cannot drift, and cannot accumulate whatever you are resetting to
+escape.
 
-It is **not** a snapshot of a working system, and there is deliberately no way
-to refresh it. That rules out a whole category of problems: it cannot drift, it
-cannot accumulate the breakage you are trying to escape, and there is no
-"which checkpoint am I restoring?" question to get wrong.
+Worth knowing:
 
-Consequences worth knowing:
-
-- Nothing needs to be made inert in the baseline. Docker is not masked there
-  because Docker was never installed there.
-- A reset genuinely removes everything - packages, containers, config under
-  `/opt`. That is intended. `install.sh` puts it back.
-- The baseline is never apt-upgraded, so it ages. `03-upgrade.sh` runs on every
-  `install.sh`, so the system you end up on is current regardless.
-- The baseline is booted only to run the restore. It is not a place to work,
-  and nothing is invested in making it pleasant. To inspect or change it,
-  mount `p4` from the live system.
+- A reset removes everything - packages, containers, config under `/opt`.
+  `install.sh` puts it back, which is why anything you want to survive has to
+  live in `install.sh` or on `/data`.
+- The baseline ages: it is never apt-upgraded. `03-upgrade.sh` runs on every
+  `install.sh`, so the system you land on is current regardless. After a Debian
+  major release upgrade, recapture it - see `USAGE.md`.
+- It is booted only to run the restore. To look at it or change it, mount `p4`
+  from the live system.
 
 ## How it's wired together
 
@@ -104,9 +100,9 @@ and cannot be set by a cold boot, so an ordinary reboot or a power cut always
 lands back on bootA with no action needed - that's the fail-safe the whole
 design leans on.
 
-The restore has to boot into the baseline because you cannot rsync over the
-filesystem you are running from. That asymmetry is inherent, not a feature: it
-is the only reason the baseline needs to be bootable at all.
+The restore boots into the baseline because you cannot rsync over the
+filesystem you are running from. That is the only reason the baseline needs to
+be bootable.
 
 ### Repo layout
 
@@ -132,15 +128,14 @@ instead.
 
 ### The capture/restore pair
 
-`01-rescue.sh` makes only three changes to the clone: retarget its fstab at
-p3/p4, write `rescue` to the role file, and install the restore machinery.
+`01-rescue.sh` makes three changes to the clone: retarget its fstab at p3/p4,
+write `rescue` to the role file, and install the restore machinery.
 `rescue/restore.sh` undoes exactly those on the way back, plus the cmdline.
 **Change one and check the other** - an edit with no inverse is silently
 inherited by the restored live system.
 
-That list is short by design. Every entry on it is a way the baseline differs
-from a freshly flashed card, which is precisely what the two rows at the top of
-this file promise not to happen.
+That list is also the complete set of ways the baseline differs from a freshly
+flashed card, which is why it is worth keeping short.
 
 ## Current status
 
@@ -154,9 +149,11 @@ the one that must not be skipped.
   else treated as disposable by a reset.
 - Never regenerate a secret that already exists on disk - that orphans whatever
   data was encrypted or keyed with the old one.
-- Resist adding anything to the baseline. Every addition is a way a restored
-  system can differ from a freshly flashed one, and the value of this design is
-  that those two are the same thing.
+- Keep the baseline minimal. Every addition is a way a restored system can
+  differ from a freshly flashed one.
 - `restore.sh` runs from a copy of `lib/common.sh` installed at
   `/usr/local/lib/homelab/common.sh`. A new `common.sh` helper that assumes it
   is running on the live system will break the restore side.
+- Write docs and comments for someone seeing this repo for the first time.
+  Explain what is here and why it works this way; leave what it replaced to the
+  commit history.

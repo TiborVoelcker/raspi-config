@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Upgrade the OS.
 #
-# Deliberately numbered AFTER 01-rescue.sh: the baseline is meant to match the
-# flashed image, and a freshly flashed card is not upgraded either. Since this
-# runs on every install.sh, a reset followed by install.sh lands on an
-# up-to-date system regardless of how old the baseline is.
+# Numbered AFTER 01-rescue.sh: the baseline matches the flashed image, which is
+# not upgraded either. Since this runs on every install.sh, a reset followed by
+# install.sh lands on an up-to-date system however old the baseline is.
 #
 # Unguarded: apt is already convergent, so there is nothing to skip.
 set -euo pipefail

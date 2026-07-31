@@ -4,11 +4,11 @@
 #
 # Runs FIRST, before any module that changes the system, so the baseline is the
 # pristine flashed OS - no /data mount, no apt upgrade, no Docker, no services.
-# That is the whole point: restoring it is meant to be equivalent to re-flashing
-# the card, after which install.sh rebuilds everything on top.
+# Restoring it is meant to be equivalent to re-flashing the card, after which
+# install.sh rebuilds everything on top.
 #
-# Captured exactly once. There is no refresh, and nothing here tries to make the
-# baseline pleasant to live in - it boots, restores, and reboots.
+# Captured exactly once. The baseline only ever boots, restores and reboots, so
+# nothing here goes further than making it bootable.
 #
 #   autoboot.txt (on bootA, p1)
 #       [all]     tryboot_a_b=1   boot_partition=1   -> normal boot, bootA
