@@ -140,6 +140,34 @@ retarget_fstab() {
     ' "$fstab" > "${fstab}.new" && mv "${fstab}.new" "$fstab"
 }
 
+# Whole days since an ISO-8601 timestamp. Fails if it cannot be parsed.
+# The empty-string check is not redundant: `date -d ""` succeeds and returns
+# midnight today, which would report a missing stamp as "today".
+age_days() {
+    local at
+    [[ -n "${1// /}" ]] || return 1
+    at=$(date -d "$1" +%s 2>/dev/null) || return 1
+    echo $(( ($(date +%s) - at) / 86400 ))
+}
+
+# Days -> "14 months ago". The singular cases are named, so the numbered ones
+# are always plural.
+human_age() {
+    local days="$1"
+    if   (( days <   0 )); then echo "in the future"
+    elif (( days ==  0 )); then echo "today"
+    elif (( days ==  1 )); then echo "yesterday"
+    elif (( days <  60 )); then echo "$days days ago"
+    elif (( days < 730 )); then echo "$(( days / 30 )) months ago"
+    else                        echo "$(( days / 365 )) years ago"
+    fi
+}
+
+# Past roughly two years a Debian release stops being current, and the
+# baseline's apt sources can stop resolving - at which point a reset leaves a
+# system install.sh cannot build on.
+BASELINE_STALE_DAYS=730
+
 # Point a boot partition's cmdline.txt at a given root partition.
 set_cmdline_root() {
     local cmdline="$1" rootn="$2"

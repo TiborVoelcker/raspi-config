@@ -21,8 +21,13 @@ if mount -o ro "$DEV_ROOT_B" "$RESCUE_ROOT_MNT" 2>/dev/null; then
 fi
 [[ -n "$stamp" ]] || die "no baseline on the rescue partition - run install.sh first"
 
+age=""
+if days=$(age_days "$stamp"); then
+    age="  ($(human_age "$days"))"
+fi
+
 warn "This ERASES the live system and restores the pristine baseline."
-echo "    baseline captured: $stamp"
+echo "    baseline captured: $stamp$age"
 echo "    preserved:         $DATA_DIR (separate disk)"
 echo "    lost:              every package, service and change since"
 echo

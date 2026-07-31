@@ -27,8 +27,18 @@ if [[ ! -b "$DEV_ROOT_B" ]]; then
 else
     mkdir -p "$RESCUE_ROOT_MNT"
     if mount -o ro "$DEV_ROOT_B" "$RESCUE_ROOT_MNT" 2>/dev/null; then
-        echo "baseline        $(cat "$RESCUE_ROOT_MNT$BASELINE_STAMP" 2>/dev/null || echo 'not captured')"
+        stamp=$(cat "$RESCUE_ROOT_MNT$BASELINE_STAMP" 2>/dev/null || echo "")
         umount "$RESCUE_ROOT_MNT"
+
+        if [[ -z "$stamp" ]]; then
+            echo "baseline        not captured - run install.sh"
+        elif days=$(age_days "$stamp"); then
+            echo "baseline        $stamp  ($(human_age "$days"))"
+            (( days > BASELINE_STALE_DAYS )) \
+                && warn "baseline is old - recapture it or reflash the card (see USAGE.md)"
+        else
+            echo "baseline        $stamp"
+        fi
     else
         warn "cannot read the rescue partition (already mounted, or not formatted)"
     fi
