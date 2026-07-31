@@ -9,7 +9,7 @@ set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"
 
 need_root
-need_cmd sfdisk partx blockdev mkfs.ext4 mkfs.vfat rsync findmnt lsblk numfmt
+need_cmd sfdisk partx blockdev udevadm mkfs.ext4 mkfs.vfat findmnt lsblk numfmt
 need_tryboot_support
 detect_disk
 
@@ -44,20 +44,13 @@ else
         cat <<EOF
 
   Almost certainly the root filesystem was auto-expanded to fill the card on
-  first boot. A mounted ext4 filesystem cannot be shrunk, so this cannot be
-  fixed from the running system.
-
-  Re-image the card, and BEFORE the first boot, mount the small FAT partition
-  on your laptop and delete this token from cmdline.txt:
+  first boot, and a mounted ext4 filesystem cannot be shrunk. Re-image, and
+  BEFORE the first boot delete this token from cmdline.txt on the small FAT
+  partition (leave the rest of the line alone):
 
       init=/usr/lib/raspberrypi-sys-mods/firstboot
 
-  Leave the rest of that line alone - Raspberry Pi Imager's own customisation
-  runs through a separate systemd.run= mechanism and keeps working.
-
-  Then boot and run install.sh again. Sanity check: p2 should be roughly
-  image-sized, not card-sized.
-      lsblk $DISK
+  Then boot and re-run install.sh. See USAGE.md, "Before first boot".
 
 EOF
         die "aborting before touching the partition table"
@@ -86,5 +79,3 @@ EOF
     mkfs.ext4 -q -L rescue "$DEV_ROOT_B"
     ok "created and formatted $DEV_BOOT_B and $DEV_ROOT_B"
 fi
-
-echo main > "$ROLE_FILE"

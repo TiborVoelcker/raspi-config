@@ -3,9 +3,8 @@
 # third-party apt source or curl-pipe-to-shell needed. Raspberry Pi OS
 # (Debian bookworm) ships packages recent enough for homelab use.
 #
-# Numbered to run AFTER 05-rescue.sh on purpose: the rescue system's first
-# snapshot is taken before this module ever runs, so - like services/ -
-# Docker never ends up on the fail-safe. See AGENTS.md.
+# Like everything after 01-rescue.sh, this never reaches the baseline, so a
+# reset removes Docker entirely and the next install.sh puts it back.
 set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"
 need_root

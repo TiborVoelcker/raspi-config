@@ -1,5 +1,6 @@
 # shellcheck shell=bash
-# Shared helpers. Sourced by install.sh and by every module.
+# Shared helpers. Sourced by install.sh, every module, and - once installed
+# into the rescue system as $COMMON_LIB - by rescue/restore.sh.
 
 set -euo pipefail
 
@@ -12,9 +13,8 @@ warn() { _c '1;33' "  !!  $*" >&2; }
 die()  { _c '1;31' "  XX  $*" >&2; exit 1; }
 
 confirm() {
-    local prompt="$1"
     [[ "${HOMELAB_ASSUME_YES:-0}" == "1" ]] && return 0
-    read -rp "$prompt [y/N] " reply
+    read -rp "$1 [y/N] " reply
     [[ "$reply" =~ ^[Yy]$ ]]
 }
 
@@ -43,19 +43,9 @@ ROLE_FILE=/etc/homelab-role
 current_role() { cat "$ROLE_FILE" 2>/dev/null || echo main; }
 
 # ---------- SD card layout ----------
-# MBR, four primaries, no extended container. /data lives on a separate USB
-# disk, which is what frees the fourth slot.
-#
-#   p1  FAT32  bootA   live system's boot partition, holds autoboot.txt
-#   p2  ext4   rootA   live system
-#   p3  FAT32  bootB   rescue system's OWN boot partition
-#   p4  ext4   rootB   rescue system
-#
-# Each system mounts its own boot partition at /boot/firmware. That is the
-# whole point of this layout: a kernel upgrade on one cannot touch the other.
-#
-# Do not convert to GPT - the firmware counts partition numbers differently
-# there and tryboot becomes hard to reason about.
+# MBR, four primaries: p1 bootA, p2 rootA, p3 bootB, p4 rootB - see AGENTS.md
+# for why. Do not convert to GPT: the firmware counts partition numbers
+# differently there and tryboot becomes hard to reason about.
 PART_BOOT_A=1
 PART_ROOT_A=2
 PART_BOOT_B=3
@@ -69,21 +59,26 @@ RESCUE_BOOT_MNT=/mnt/rescue-boot
 MAIN_ROOT_MNT=/mnt/main
 MAIN_BOOT_MNT=/mnt/main-boot
 
-# Only meaningful from INSIDE the rescue system, where bootB is at $BOOT_DIR.
-# The live system uses arm_restore()/disarm_restore() below instead.
-ARM_MARKER="$BOOT_DIR/homelab-restore.arm"
+# Where the rescue system keeps its own copy of this file.
+COMMON_LIB=/usr/local/lib/homelab/common.sh
 
-# The /data fstab line is generated once by 01-data.sh and stashed here so a
-# restore can put it back. It lives on the boot partition because that is
-# reachable from both systems.
-DATA_FSTAB_SNIPPET="$BOOT_DIR/homelab-data.fstab"
+# The rescue system looks for the arm marker on its own boot partition, which
+# is $BOOT_DIR only from INSIDE the rescue system. The live system reaches it
+# through arm_restore()/restore_armed() at the bottom.
+ARM_NAME=homelab-restore.arm
+ARM_MARKER="$BOOT_DIR/$ARM_NAME"
+
+# Written into the baseline when it is captured, and the proof that rootB holds
+# a real system rather than an empty filesystem.
+BASELINE_STAMP=/etc/homelab-baseline
 
 # Proves the external disk is really mounted and is really ours. Docker refuses
 # to start without it, which is what stops containers initialising fresh
 # databases into an empty mount point.
 DATA_MARKER="$DATA_DIR/.homelab-data"
 
-# Populates: DISK, DISK_ID, DEV_BOOT_A, DEV_ROOT_A, DEV_BOOT_B, DEV_ROOT_B
+# Populates: DISK, DISK_ID, DEV_BOOT_A, DEV_ROOT_A, DEV_BOOT_B, DEV_ROOT_B.
+# Works from either system - both boot off the same card.
 detect_disk() {
     local root_src pk
     root_src=$(findmnt -no SOURCE /) || die "cannot determine root source"
@@ -106,6 +101,7 @@ detect_disk() {
 
 partuuid_for() { printf '%s-%02d\n' "$DISK_ID" "$1"; }
 
+# ---------- copying one system onto the other ----------
 # Excluded from every rootfs copy. /data is excluded because it is a separate
 # disk entirely; /boot/firmware because it is copied separately, with its own
 # per-system edits.
@@ -116,6 +112,15 @@ RSYNC_EXCLUDES=(
     --exclude=/data/*     --exclude=/boot/firmware/*
     --exclude=/var/swap
 )
+
+# Recreate the mount points whose contents RSYNC_EXCLUDES skipped.
+make_runtime_dirs() {
+    local root="$1" d
+    for d in dev proc sys tmp run mnt media data boot/firmware; do
+        mkdir -p "$root/$d"
+    done
+    chmod 1777 "$root/tmp"
+}
 
 # Rewrite a cloned system's fstab so it points at its own partitions.
 # usage: retarget_fstab <fstab-path> <boot-partnum> <root-partnum>
@@ -135,6 +140,34 @@ retarget_fstab() {
     ' "$fstab" > "${fstab}.new" && mv "${fstab}.new" "$fstab"
 }
 
+# Whole days since an ISO-8601 timestamp. Fails if it cannot be parsed.
+# The empty-string check is not redundant: `date -d ""` succeeds and returns
+# midnight today, which would report a missing stamp as "today".
+age_days() {
+    local at
+    [[ -n "${1// /}" ]] || return 1
+    at=$(date -d "$1" +%s 2>/dev/null) || return 1
+    echo $(( ($(date +%s) - at) / 86400 ))
+}
+
+# Days -> "14 months ago". The singular cases are named, so the numbered ones
+# are always plural.
+human_age() {
+    local days="$1"
+    if   (( days <   0 )); then echo "in the future"
+    elif (( days ==  0 )); then echo "today"
+    elif (( days ==  1 )); then echo "yesterday"
+    elif (( days <  60 )); then echo "$days days ago"
+    elif (( days < 730 )); then echo "$(( days / 30 )) months ago"
+    else                        echo "$(( days / 365 )) years ago"
+    fi
+}
+
+# Past roughly two years a Debian release stops being current, and the
+# baseline's apt sources can stop resolving - at which point a reset leaves a
+# system install.sh cannot build on.
+BASELINE_STALE_DAYS=730
+
 # Point a boot partition's cmdline.txt at a given root partition.
 set_cmdline_root() {
     local cmdline="$1" rootn="$2"
@@ -144,27 +177,33 @@ set_cmdline_root() {
         "$cmdline"
 }
 
-# ---------- arming the restore ----------
-# With independent boot partitions, each system mounts its own at
-# /boot/firmware. The rescue system therefore looks for the arm marker on
-# bootB, so the live system must write it there - not onto its own bootA.
+# ---------- arming the restore, from the live system ----------
+# The rescue system looks for the arm marker on bootB, so the live system has
+# to mount bootB to place or read it. Returns 1 rather than dying when there is
+# no bootB yet, so homelab-status can report on a half-provisioned card.
 _with_rescue_boot() {
-    local action="$1" was_mounted=0
+    local action="$1" mounted=0 rc=0
+    [[ -b "${DEV_BOOT_B:?run detect_disk first}" ]] || return 1
+
     mkdir -p "$RESCUE_BOOT_MNT"
     if mountpoint -q "$RESCUE_BOOT_MNT"; then
-        was_mounted=1
+        mounted=1
     else
-        mount "$DEV_BOOT_B" "$RESCUE_BOOT_MNT" || die "cannot mount rescue boot partition"
+        local opts=()
+        [[ "$action" == check ]] && opts=(-o ro)
+        mount "${opts[@]}" "$DEV_BOOT_B" "$RESCUE_BOOT_MNT" \
+            || die "cannot mount rescue boot partition"
     fi
+
+    local marker="$RESCUE_BOOT_MNT/$ARM_NAME"
     case "$action" in
-        arm)    touch "$RESCUE_BOOT_MNT/homelab-restore.arm" ;;
-        disarm) rm -f "$RESCUE_BOOT_MNT/homelab-restore.arm" ;;
-        check)  [[ -f "$RESCUE_BOOT_MNT/homelab-restore.arm" ]] && ARMED=1 || ARMED=0 ;;
+        arm)   touch "$marker"; sync ;;
+        check) [[ -f "$marker" ]] || rc=1 ;;
     esac
-    sync
-    (( was_mounted )) || umount "$RESCUE_BOOT_MNT"
+
+    (( mounted )) || umount "$RESCUE_BOOT_MNT"
+    return "$rc"
 }
 
-arm_restore()    { _with_rescue_boot arm; }
-disarm_restore() { _with_rescue_boot disarm; }
-restore_armed()  { _with_rescue_boot check; [[ "$ARMED" == "1" ]]; }
+arm_restore()   { _with_rescue_boot arm; }
+restore_armed() { _with_rescue_boot check; }

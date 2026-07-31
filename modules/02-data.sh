@@ -2,13 +2,10 @@
 # Mount the external USB disk at /data, and make Docker refuse to start without
 # it.
 #
-# The hazard being defended against: if the disk is absent but Docker starts
-# anyway, bind mounts CREATE empty directories under /data. Paperless then sees
-# no database, concludes it is a fresh install, and initialises one on the SD
-# card while the real data sits untouched on the unmounted disk. Recovering
-# from that is miserable, so we make it impossible instead.
-#
-# Two layers:
+# The hazard: if the disk is absent but Docker starts anyway, bind mounts
+# CREATE empty directories under /data. Paperless then sees no database,
+# concludes it is a fresh install, and initialises one on the SD card while the
+# real data sits untouched on the unmounted disk. Three layers stop that:
 #   nofail            -> the Pi still boots without the disk, so you can SSH in
 #   RequiresMountsFor -> Docker will not start until /data is genuinely mounted
 #   marker file       -> catches "mounted, but it is the wrong disk"
@@ -16,7 +13,7 @@ set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"
 
 need_root
-need_cmd lsblk blkid findmnt
+need_cmd lsblk blkid findmnt sfdisk
 detect_disk
 
 mkdir -p "$DATA_DIR"
@@ -62,8 +59,7 @@ else
 
     # UUID, never /dev/sdX - device letters shift with enumeration order.
     printf 'UUID=%s %s ext4 defaults,noatime,nofail,x-systemd.device-timeout=30 0 2\n' \
-        "$data_uuid" "$DATA_DIR" > "$DATA_FSTAB_SNIPPET"
-    cat "$DATA_FSTAB_SNIPPET" >> /etc/fstab
+        "$data_uuid" "$DATA_DIR" >> /etc/fstab
 
     systemctl daemon-reload
     ok "added $DATA_DIR to fstab (UUID=$data_uuid)"
