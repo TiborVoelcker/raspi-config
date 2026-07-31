@@ -88,6 +88,12 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
   UUID, and makes `docker.service` refuse to start unless it's genuinely
   mounted (guards against Paperless-style silent data loss into an empty
   bind-mount directory - see the comment at the top of that file).
+- `modules/02-upgrade.sh` - `apt-get update && apt-get upgrade`, before the
+  rescue system's first snapshot exists (see `05-rescue.sh`), so that
+  snapshot starts from an up-to-date system rather than whatever was on the
+  card the day it was flashed. Unconditional every run, same as the Docker
+  Compose line below - apt is already convergent, so there's nothing to
+  guard. Warns (doesn't act) if a reboot is needed to finish the upgrade.
 - `modules/05-rescue.sh` - first-time setup of the rescue partitions: clones
   the live boot+root onto `p3`/`p4`, retargets the clone's `fstab`/`cmdline`
   to its own partitions, marks its role as `rescue`, masks Docker there, and
@@ -95,8 +101,9 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
 - `modules/11-docker.sh` - installs Docker Engine + the Compose plugin from
   Debian's own repos (`docker.io`, `docker-compose-v2`). Numbered well after
   `05-rescue.sh` on purpose: the rescue system's one-time initial clone
-  happens before this module ever runs, so - like `services/` - Docker never
-  ends up on the fail-safe baseline. `01-data.sh`'s systemd drop-in for
+  happens before this module ever runs, so Docker never ends up on the
+  fail-safe baseline, same reasoning as `02-upgrade.sh` and why service
+  modules start at `20-`. `01-data.sh`'s systemd drop-in for
   `docker.service` is written before Docker even exists on disk; that's
   fine, systemd drop-ins apply whenever the base unit shows up later.
 - `modules/20-paperless.sh` - the only service module so far, and the
@@ -134,7 +141,8 @@ bootA with no action needed - that's the fail-safe the whole design leans on.
 Implemented and (structurally) reviewed:
 
 - [x] `install.sh` + `lib/common.sh`
-- [x] `modules/00-storage.sh`, `01-data.sh`, `05-rescue.sh`, `11-docker.sh`
+- [x] `modules/00-storage.sh`, `01-data.sh`, `02-upgrade.sh`, `05-rescue.sh`,
+      `11-docker.sh`
 - [x] `modules/20-paperless.sh` as the service-module template
 - [x] `bin/homelab-checkpoint`
 - [x] `bin/homelab-reset`
