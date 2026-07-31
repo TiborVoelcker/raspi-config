@@ -9,11 +9,12 @@ source "$REPO_DIR/lib/common.sh"
 need_root
 
 if [[ "$(current_role)" == "rescue" ]]; then
-    die "this is the rescue system - do not provision from here (see README)"
+    die "this is the baseline system - do not provision from here (see README)"
 fi
+echo main > "$ROLE_FILE"
 
 log "raspi-homelab provisioning"
-echo "    disk modules run first; service modules after"
+echo "    storage and the baseline first; everything else on top"
 echo
 
 for module in "$REPO_DIR"/modules/*.sh; do
@@ -35,6 +36,5 @@ done
 echo
 ok "done"
 echo
-echo "  homelab-checkpoint   snapshot this system onto the rescue partition"
-echo "  homelab-reset        wipe this system back to the last checkpoint"
-echo "  homelab-status       show partition + checkpoint state"
+echo "  homelab-reset        wipe this system back to the pristine baseline"
+echo "  homelab-status       show partition + baseline state"

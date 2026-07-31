@@ -1,5 +1,5 @@
 [Unit]
-Description=Restore the live system from this rescue checkpoint, if armed
+Description=Restore the live system from the pristine baseline, if armed
 # The arm marker lives on this system's own boot partition (bootB). Checking it
 # here is only a cheap first pass; restore.sh re-checks it along with the role
 # and tryboot gates.

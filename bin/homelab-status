@@ -23,11 +23,11 @@ else
 fi
 echo
 if [[ ! -b "$DEV_ROOT_B" ]]; then
-    echo "checkpoint      no rescue partition - run install.sh"
+    echo "baseline        no rescue partition - run install.sh"
 else
     mkdir -p "$RESCUE_ROOT_MNT"
     if mount -o ro "$DEV_ROOT_B" "$RESCUE_ROOT_MNT" 2>/dev/null; then
-        echo "checkpoint      $(cat "$RESCUE_ROOT_MNT/etc/homelab-checkpoint" 2>/dev/null || echo 'none recorded')"
+        echo "baseline        $(cat "$RESCUE_ROOT_MNT$BASELINE_STAMP" 2>/dev/null || echo 'not captured')"
         umount "$RESCUE_ROOT_MNT"
     else
         warn "cannot read the rescue partition (already mounted, or not formatted)"

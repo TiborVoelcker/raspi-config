@@ -79,5 +79,3 @@ EOF
     mkfs.ext4 -q -L rescue "$DEV_ROOT_B"
     ok "created and formatted $DEV_BOOT_B and $DEV_ROOT_B"
 fi
-
-echo main > "$ROLE_FILE"

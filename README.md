@@ -1,15 +1,18 @@
 # raspi-homelab
 
 Convergent, script-driven provisioning for my Raspberry Pi homelab, plus a
-self-hosted "reset button": a fully independent rescue system living on spare
-SD card space that can restore the live system at any time, no other computer
-required. Service data lives on a separate external disk, so a reset never
-touches it.
+self-hosted "reset button": a pristine copy of the flashed OS lives on spare SD
+card space and can be put back at any time, no other computer required. Service
+data lives on a separate external disk, so a reset never touches it.
 
-Roughly: `install.sh` runs small idempotent modules to set up storage, the
-rescue partitions and each service; `homelab-checkpoint` snapshots the live
-system onto the rescue partitions whenever you're happy with its state; a
-reboot into the rescue system can then restore from that snapshot.
+`install.sh` is the single source of truth for what this Pi should look like.
+It runs small idempotent modules and is safe to re-run. Early on it captures a
+**baseline** - the system exactly as it came off the SD card image - onto its
+own pair of partitions, and never touches it again.
 
-See `AGENTS.md` for the full design and current implementation status, and
-`USAGE.md` for setup and day-to-day commands.
+`homelab-reset` puts that baseline back. The result is equivalent to
+re-flashing the card, so the recovery is always the same two steps: reset, then
+re-run `install.sh`.
+
+See `AGENTS.md` for the design and `USAGE.md` for setup and day-to-day
+commands.

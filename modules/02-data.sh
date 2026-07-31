@@ -21,9 +21,6 @@ mkdir -p "$DATA_DIR"
 # ---------- already configured? ----------
 if grep -q "[[:space:]]${DATA_DIR}[[:space:]]" /etc/fstab; then
     skip "fstab already has $DATA_DIR"
-    # Re-stash it even so: a restore reads this copy, and the line may predate
-    # this module (added by hand, or by a version that never wrote the file).
-    grep "[[:space:]]${DATA_DIR}[[:space:]]" /etc/fstab > "$DATA_FSTAB_SNIPPET"
 else
     # Candidates: block devices that are not the SD card we booted from.
     mapfile -t candidates < <(
@@ -62,8 +59,7 @@ else
 
     # UUID, never /dev/sdX - device letters shift with enumeration order.
     printf 'UUID=%s %s ext4 defaults,noatime,nofail,x-systemd.device-timeout=30 0 2\n' \
-        "$data_uuid" "$DATA_DIR" > "$DATA_FSTAB_SNIPPET"
-    cat "$DATA_FSTAB_SNIPPET" >> /etc/fstab
+        "$data_uuid" "$DATA_DIR" >> /etc/fstab
 
     systemctl daemon-reload
     ok "added $DATA_DIR to fstab (UUID=$data_uuid)"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Arm a restore and reboot into the rescue system, which overwrites this one.
+# Arm a restore and reboot into the baseline system, which overwrites this one.
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 source "$REPO_DIR/lib/common.sh"
@@ -10,26 +10,29 @@ detect_disk
 [[ -b "$DEV_ROOT_B" ]] || die "no rescue partition"
 [[ -f "$BOOT_DIR/autoboot.txt" ]] || die "autoboot.txt missing - run install.sh first"
 
-# Refuse without a readable timestamp. An unpopulated rootB would tryboot into
-# a partition with no kernel while leaving the arm marker set - exactly the
-# "you now need another computer" hole this repo exists to close.
+# Refuse without a readable stamp. An unpopulated rootB would tryboot into a
+# partition with no kernel while leaving the arm marker set - exactly the "you
+# now need another computer" hole this repo exists to close.
 stamp=""
 mkdir -p "$RESCUE_ROOT_MNT"
 if mount -o ro "$DEV_ROOT_B" "$RESCUE_ROOT_MNT" 2>/dev/null; then
-    stamp=$(cat "$RESCUE_ROOT_MNT/etc/homelab-checkpoint" 2>/dev/null || echo "")
+    stamp=$(cat "$RESCUE_ROOT_MNT$BASELINE_STAMP" 2>/dev/null || echo "")
     umount "$RESCUE_ROOT_MNT"
 fi
-[[ -n "$stamp" ]] || die "no checkpoint on the rescue partition - run homelab-checkpoint first"
+[[ -n "$stamp" ]] || die "no baseline on the rescue partition - run install.sh first"
 
-warn "This ERASES the live system and replaces it with the checkpoint."
-echo "    checkpoint taken:  $stamp"
+warn "This ERASES the live system and restores the pristine baseline."
+echo "    baseline captured: $stamp"
 echo "    preserved:         $DATA_DIR (separate disk)"
-echo "    lost:              everything else not in the checkpoint"
+echo "    lost:              every package, service and change since"
+echo
+echo "    Equivalent to re-flashing the card. Re-run install.sh afterwards"
+echo "    to rebuild the homelab."
 echo
 confirm "Type y to reset" || die "cancelled"
 
 arm_restore
 
-ok "armed - rebooting into rescue"
+ok "armed - rebooting into the baseline"
 sleep 2
 exec reboot "0 tryboot"
