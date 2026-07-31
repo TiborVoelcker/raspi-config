@@ -1,30 +1,29 @@
 # Agent notes
 
-Context for whoever (human or AI) picks this repo up next. Keep this file
-updated as the design changes or modules get added - it's meant to reflect
-current reality, not the day it was written.
+Context for whoever (human or AI) picks this repo up next. Keep it reflecting
+current reality, not the day it was written. Each script's own header comment
+explains what that script does; this file covers what you cannot see from
+inside a single file.
 
 ## What we're trying to achieve
 
 Reproducible, script-driven provisioning for a Raspberry Pi homelab, plus a
-self-hosted "reset button": if the live system gets into a bad state, you can
-reboot into a fully independent rescue copy and restore from it, without
-needing a second computer, a fresh SD card, or physical access beyond a
-reboot.
+self-hosted "reset button": if the live system gets into a bad state, reboot
+into a fully independent rescue copy and restore from it - no second computer,
+no fresh SD card, no physical access beyond a reboot.
 
 Two ideas make that possible:
 
-1. **Convergent provisioning.** `install.sh` runs a set of small, idempotent
-   modules. Each one either does its job or no-ops because the work is
-   already done, so re-running `install.sh` after adding a module only does
-   the new work.
+1. **Convergent provisioning.** `install.sh` runs small idempotent modules in
+   lexicographic order. Each either does its job or no-ops, so re-running after
+   adding a module only does the new work.
 2. **A fully independent rescue system**, carved out of unallocated space at
-   the end of the SD card, using the Raspberry Pi firmware's `tryboot`
-   mechanism. It has its own boot partition, so a kernel upgrade on the live
-   system can never disturb it.
+   the end of the SD card and reached through the firmware's `tryboot`
+   mechanism. Its own boot partition means a kernel upgrade on the live system
+   can never disturb it.
 
-Service state (Paperless documents, database files, etc.) lives on a
-**separate external disk**, not on the SD card, so a reset never touches it.
+Service state (Paperless documents, databases) lives on a **separate external
+disk**, so a reset never touches it.
 
 ## How it's wired together
 
@@ -37,20 +36,18 @@ p3  FAT32  bootB   rescue system's OWN boot partition
 p4  ext4   rootB   rescue system
 ```
 
-Plus a separate USB disk, ext4, mounted at `/data`. Putting `/data` on its own
-disk is what frees up the fourth MBR slot for the rescue root partition,
-and it means a reset (which wipes/restores the SD card) never touches service
-data at all.
+Plus a separate USB disk at `/data`. Putting `/data` on its own disk is what
+frees the fourth MBR slot for rootB, and it keeps service data out of the reset
+scope entirely.
 
-Each system mounts *its own* boot partition at `/boot/firmware` - that is the
+Each system mounts *its own* boot partition at `/boot/firmware`. That is the
 whole point of the layout: a kernel upgrade on one cannot touch the other's
-kernel/overlays/cmdline.
+kernel, overlays or cmdline.
 
-`p3`/`p4` are carved from unallocated space at the end of the card by
-`modules/00-storage.sh`, which is why the SD card must **not** be allowed to
-auto-expand `p2` to fill the whole disk on first boot (see `USAGE.md`,
-"Before first boot" - a mounted ext4 filesystem cannot be shrunk, so this has
-to be handled before the first boot, not fixed up after).
+`p3`/`p4` are carved from unallocated space at the end of the card, which is
+why the card must **not** auto-expand `p2` on first boot - a mounted ext4
+filesystem cannot be shrunk, so this has to be handled before the first boot,
+not fixed up after. See `USAGE.md`, "Before first boot".
 
 ### tryboot / autoboot.txt
 
@@ -67,110 +64,67 @@ boot_partition=3
 
 `tryboot_a_b=1` makes the firmware read the ordinary `config.txt` from
 whichever partition it lands on, so the switch happens at the *partition*
-level (kernel, overlays, cmdline all come from bootB when tryboot fires), not
-by swapping individual files. The tryboot flag is one-shot and cannot be set
-by a cold boot, so an ordinary reboot or a power cut always lands back on
-bootA with no action needed - that's the fail-safe the whole design leans on.
+level rather than by swapping individual files. The tryboot flag is one-shot
+and cannot be set by a cold boot, so an ordinary reboot or a power cut always
+lands back on bootA with no action needed - that's the fail-safe the whole
+design leans on.
 
 ### Repo layout
 
-- `install.sh` - entry point. Runs every `modules/*.sh` in lexicographic
-  order (hence the numeric prefixes: disk/storage modules first, service
-  modules after), then symlinks everything in `bin/` into `/usr/local/sbin`.
-- `lib/common.sh` - sourced by `install.sh` and every module. Output helpers
-  (`log`/`ok`/`skip`/`warn`/`die`), guards (`need_root`, `need_cmd`,
-  `need_tryboot_support`), the partition-layout constants, `detect_disk`,
-  and the rescue-boot helpers (`arm_restore`/`disarm_restore`/
-  `restore_armed`) used to signal the rescue system that a restore was
-  actually requested.
-- `modules/00-storage.sh` - carves `p3`/`p4` out of unallocated space.
-- `modules/01-data.sh` - finds/mounts the external data disk at `/data` by
-  UUID, and makes `docker.service` refuse to start unless it's genuinely
-  mounted (guards against Paperless-style silent data loss into an empty
-  bind-mount directory - see the comment at the top of that file).
-- `modules/02-upgrade.sh` - `apt-get update && apt-get upgrade`, before the
-  rescue system's first snapshot exists (see `05-rescue.sh`), so that
-  snapshot starts from an up-to-date system rather than whatever was on the
-  card the day it was flashed. Unconditional every run, same as the Docker
-  Compose line below - apt is already convergent, so there's nothing to
-  guard. Warns (doesn't act) if a reboot is needed to finish the upgrade.
-- `modules/05-rescue.sh` - first-time setup of the rescue partitions: clones
-  the live boot+root onto `p3`/`p4`, retargets the clone's `fstab`/`cmdline`
-  to its own partitions, marks its role as `rescue`, masks Docker there, and
-  installs the restore service. Also writes `autoboot.txt`.
-- `modules/11-docker.sh` - installs Docker Engine + the Compose plugin from
-  Debian's own repos (`docker.io`, `docker-compose-v2`). Numbered well after
-  `05-rescue.sh` on purpose: the rescue system's one-time initial clone
-  happens before this module ever runs, so Docker never ends up on the
-  fail-safe baseline, same reasoning as `02-upgrade.sh` and why service
-  modules start at `20-`. `01-data.sh`'s systemd drop-in for
-  `docker.service` is written before Docker even exists on disk; that's
-  fine, systemd drop-ins apply whenever the base unit shows up later.
-- `modules/20-paperless.sh` - the only service module so far, and the
-  template for future ones: state on `/data` (survives a reset), config
-  fetched from upstream once, secrets generated once (never regenerated -
-  that would orphan existing data), `docker compose up -d` left unguarded
-  since Compose already reconciles state.
-- `bin/homelab-checkpoint` - re-syncs the live system onto the rescue
-  partitions. Run this whenever the current state is one you'd be happy to
-  return to; it's what a reset actually restores.
-- `bin/homelab-reset` - shows the last checkpoint's timestamp, confirms,
-  arms the restore (`arm_restore` in `lib/common.sh`), and triggers an
-  immediate tryboot (`reboot "0 tryboot"`). Everything past that point
-  happens inside the rescue system via `rescue/homelab-restore.service`.
-- `bin/homelab-status` - read-mostly snapshot of where things stand: role,
-  whether this boot was a tryboot, partition table, whether `/data` is
-  mounted (and carries its marker), the rescue partition's last checkpoint
-  timestamp, and whether a restore is currently armed.
-- `rescue/restore.sh` - installed into the rescue system as
-  `/usr/local/sbin/homelab-restore`. Runs on every rescue boot but is gated
-  three ways, all of which must hold: role is `rescue`, this boot was a real
-  tryboot (not the rescue system started some other way), and an "arm"
-  marker file is present on the rescue boot partition. Only then does it
-  overwrite the live system's `p1`/`p2` with itself and reboot back into it.
-- `rescue/homelab-restore.service` - the systemd unit that runs
-  `restore.sh` at boot. **Not part of the original design artifacts** - I
-  wrote this myself since `05-rescue.sh`/`homelab-checkpoint` both install it
-  but no content for it existed yet. It's a plain oneshot tied to
-  `multi-user.target`, gated again with `ConditionPathExists` on the arm
-  marker as a cheap first check. Review it - it's the one file here that
-  hasn't been through the same scrutiny as the rest.
+| Path | Role |
+| --- | --- |
+| `install.sh` | Entry point: runs `modules/*.sh` in order, then symlinks `bin/` into `/usr/local/sbin`. |
+| `lib/common.sh` | Sourced by everything, including `restore.sh` inside the rescue system. Output helpers, guards, layout constants, clone/restore primitives. |
+| `modules/00-storage.sh` | Carves `p3`/`p4` out of unallocated space. |
+| `modules/01-data.sh` | Mounts the external disk at `/data` by UUID; makes Docker refuse to start unless it is genuinely mounted. |
+| `modules/02-upgrade.sh` | `apt-get update && upgrade`, before the first rescue snapshot exists. |
+| `modules/05-rescue.sh` | First-time clone onto `p3`/`p4`; writes `autoboot.txt`. |
+| `modules/11-docker.sh` | Docker Engine + Compose plugin from Debian's repos. |
+| `modules/20-paperless.sh` | The only service module so far, and the template for the rest. |
+| `bin/homelab-checkpoint` | Re-syncs the live system onto the rescue partitions. This is what a reset restores to. |
+| `bin/homelab-reset` | Arms the restore and triggers a tryboot. |
+| `bin/homelab-status` | Read-only snapshot: role, tryboot, partitions, `/data`, checkpoint age, armed? |
+| `rescue/restore.sh` | Installed into the rescue system as `/usr/local/sbin/homelab-restore`. Overwrites `p1`/`p2` with itself, behind three gates. |
+| `rescue/homelab-restore.service` | Runs `restore.sh` at boot on the rescue system. |
+
+Numeric prefixes carry meaning beyond ordering: `05-rescue.sh` takes the first
+clone, so anything numbered after it (Docker, and every `20-` service module)
+is absent from that first fail-safe baseline. Later checkpoints do copy Docker
+across - it stays inert there because `finalise_rescue_system` masks it.
+
+### The clone/restore pair
+
+`finalise_rescue_system()` in `lib/common.sh` applies every rescue-specific
+edit: fstab retarget, `/data` line removal, role, hostname, Docker mask,
+restore-service install. `rescue/restore.sh` undoes exactly that list on the
+way back. **They must be read and changed as a pair** - a rescue-specific edit
+with no inverse is silently inherited by the restored live system.
+
+Both `05-rescue.sh` (first clone) and `homelab-checkpoint` (every refresh) call
+that one function rather than each carrying its own copy of the sequence. An
+earlier version kept them duplicated, on the theory that side-by-side copies
+make drift obvious; they sit in different files, they drifted anyway (a missing
+rsync exclude), and nobody noticed.
 
 ## Current status
 
-Implemented and (structurally) reviewed:
+Everything above is implemented. Not built yet:
 
-- [x] `install.sh` + `lib/common.sh`
-- [x] `modules/00-storage.sh`, `01-data.sh`, `02-upgrade.sh`, `05-rescue.sh`,
-      `11-docker.sh`
-- [x] `modules/20-paperless.sh` as the service-module template
-- [x] `bin/homelab-checkpoint`
-- [x] `bin/homelab-reset`
-- [x] `bin/homelab-status`
-- [x] `rescue/restore.sh`
-- [x] `rescue/homelab-restore.service` (authored by me, needs a real look)
+- [ ] `bin/homelab-rescue-shell` - boot into rescue *without* arming a restore,
+      to look around safely. Today the only ways to see the rescue system are
+      `homelab-reset` (which commits to a restore) or booting it by hand.
 
-Deliberately not built yet:
-
-- [ ] `bin/homelab-rescue-shell` - boot into rescue *without* arming a
-      restore, to look around safely. Without it, the only way to inspect
-      the rescue system today is `homelab-reset` itself (which commits to
-      an actual restore) or booting it by hand and clearing the arm marker
-      yourself.
-
-`install.sh`'s closing banner (`homelab-checkpoint`/`homelab-reset`/
-`homelab-status`) is now fully accurate. The full checkpoint -> reset round
-trip can be exercised end-to-end; see `USAGE.md`'s "Test order".
+None of this has been exercised on real hardware yet. `USAGE.md`'s "Test order"
+is the sequence to do that with, and step 3 is the one that must not be
+skipped.
 
 ## Things to watch for when extending this
 
-- Any new service module should follow `20-paperless.sh`'s shape: state on
-  `/data`, everything else treated as disposable by a reset.
-- Anything that writes to *both* the live and rescue systems (like the
-  restore-service install step) should stay duplicated between
-  `05-rescue.sh` and `homelab-checkpoint` rather than factored into a shared
-  function that only one of them calls with different mount points - keeping
-  them textually side-by-side makes it obvious when one drifts from the
-  other.
-- Never regenerate a secret/credential that already exists on disk - that
-  orphans whatever data was encrypted/keyed with the old one.
+- New service modules follow `20-paperless.sh`: state on `/data`, everything
+  else treated as disposable by a reset.
+- Never regenerate a secret that already exists on disk - that orphans whatever
+  data was encrypted or keyed with the old one.
+- Any new rescue-specific edit needs its inverse in `rescue/restore.sh`.
+- `restore.sh` runs from a copy of `lib/common.sh` installed at
+  `/usr/local/lib/homelab/common.sh`. A new `common.sh` helper that assumes it
+  is running on the live system will break the rescue side.

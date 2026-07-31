@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
+# Read-only snapshot of where things stand. Safe to run on a card that has not
+# been provisioned yet - every section degrades to a message rather than an
+# error.
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 source "$REPO_DIR/lib/common.sh"
+
+need_root   # sfdisk --disk-id and the rescue mounts both need it
 detect_disk
 
 echo "role            $(current_role)"
@@ -17,14 +22,16 @@ else
     warn "data disk NOT mounted - docker will refuse to start"
 fi
 echo
-if [[ -b "$DEV_ROOT_B" ]]; then
+if [[ ! -b "$DEV_ROOT_B" ]]; then
+    echo "checkpoint      no rescue partition - run install.sh"
+else
     mkdir -p "$RESCUE_ROOT_MNT"
     if mount -o ro "$DEV_ROOT_B" "$RESCUE_ROOT_MNT" 2>/dev/null; then
         echo "checkpoint      $(cat "$RESCUE_ROOT_MNT/etc/homelab-checkpoint" 2>/dev/null || echo 'none recorded')"
         umount "$RESCUE_ROOT_MNT"
+    else
+        warn "cannot read the rescue partition (already mounted, or not formatted)"
     fi
-else
-    echo "checkpoint      no rescue partition"
+    restore_armed && warn "RESTORE ARMED - next tryboot will wipe the live system"
 fi
-restore_armed && warn "RESTORE ARMED - next tryboot will wipe the live system"
-exit 0
+exit 0   # restore_armed returning "not armed" must not fail the script

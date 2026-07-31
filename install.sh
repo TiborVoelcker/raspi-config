@@ -27,10 +27,9 @@ done
 log "installing helper commands"
 for helper in "$REPO_DIR"/bin/*; do
     [[ -f "$helper" ]] || continue
-    target="/usr/local/sbin/$(basename "$helper")"
-    ln -sfn "$helper" "$target"
-    chmod +x "$helper"
-    ok "$(basename "$helper") -> $target"
+    name=$(basename "$helper")
+    ln -sfn "$helper" "/usr/local/sbin/$name"
+    ok "$name -> /usr/local/sbin/$name"
 done
 
 echo

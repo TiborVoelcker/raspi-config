@@ -2,13 +2,10 @@
 # Mount the external USB disk at /data, and make Docker refuse to start without
 # it.
 #
-# The hazard being defended against: if the disk is absent but Docker starts
-# anyway, bind mounts CREATE empty directories under /data. Paperless then sees
-# no database, concludes it is a fresh install, and initialises one on the SD
-# card while the real data sits untouched on the unmounted disk. Recovering
-# from that is miserable, so we make it impossible instead.
-#
-# Two layers:
+# The hazard: if the disk is absent but Docker starts anyway, bind mounts
+# CREATE empty directories under /data. Paperless then sees no database,
+# concludes it is a fresh install, and initialises one on the SD card while the
+# real data sits untouched on the unmounted disk. Three layers stop that:
 #   nofail            -> the Pi still boots without the disk, so you can SSH in
 #   RequiresMountsFor -> Docker will not start until /data is genuinely mounted
 #   marker file       -> catches "mounted, but it is the wrong disk"
@@ -16,7 +13,7 @@ set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"
 
 need_root
-need_cmd lsblk blkid findmnt
+need_cmd lsblk blkid findmnt sfdisk
 detect_disk
 
 mkdir -p "$DATA_DIR"
@@ -24,6 +21,9 @@ mkdir -p "$DATA_DIR"
 # ---------- already configured? ----------
 if grep -q "[[:space:]]${DATA_DIR}[[:space:]]" /etc/fstab; then
     skip "fstab already has $DATA_DIR"
+    # Re-stash it even so: a restore reads this copy, and the line may predate
+    # this module (added by hand, or by a version that never wrote the file).
+    grep "[[:space:]]${DATA_DIR}[[:space:]]" /etc/fstab > "$DATA_FSTAB_SNIPPET"
 else
     # Candidates: block devices that are not the SD card we booted from.
     mapfile -t candidates < <(

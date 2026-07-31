@@ -14,7 +14,7 @@ container volumes need.
 `01-data.sh` adds an fstab entry by UUID (never `/dev/sda1` - device letters
 shift with enumeration order), with `nofail` so the Pi still boots without the
 disk, and installs a systemd drop-in so Docker refuses to start unless `/data`
-is mounted *and* carries the marker file.
+is mounted *and* carries its marker file.
 
 That guard matters more than it looks. Without it, an absent disk means bind
 mounts silently create empty directories under `/data`; Paperless finds no
@@ -48,15 +48,11 @@ init=/usr/lib/raspberrypi-sys-mods/firstboot
 ```
 
 Leave the rest of the line alone - Imager's own customisation runs through a
-separate `systemd.run=` mechanism and keeps working. Check afterwards that
-`p2` is roughly image-sized rather than card-sized:
+separate `systemd.run=` mechanism and keeps working. Check afterwards with
+`lsblk` that `p2` is roughly image-sized rather than card-sized.
 
-```bash
-lsblk
-```
-
-If you forget, `install.sh` refuses to touch the partition table and tells
-you to re-image rather than improvising.
+If you forget, `install.sh` refuses to touch the partition table and tells you
+to re-image rather than improvising.
 
 ## Install
 
@@ -66,8 +62,8 @@ cd ~/raspi-homelab
 sudo ./install.sh
 ```
 
-Re-run any time. Every module no-ops where its work is already done, so
-adding a module and re-running only does the new work.
+Re-run any time. Every module no-ops where its work is already done, so adding
+a module and re-running only does the new work.
 
 ## Day to day
 
@@ -79,36 +75,32 @@ sudo homelab-reset           # wipe live, restore from last checkpoint
 
 Checkpointing runs live because the rescue partitions aren't in use while
 you're on the live system. Restoring needs a reboot into rescue, because you
-can't overwrite the filesystem you're currently running from - that
-asymmetry is inherent, not a design choice. `homelab-reset` shows you the
-checkpoint's timestamp and asks for confirmation before it arms anything -
-read that timestamp, it's the only preview you get of what you're about to
-lose.
+can't overwrite the filesystem you're currently running from - that asymmetry
+is inherent, not a design choice.
 
-`homelab-rescue-shell` (boot into rescue *without* committing to a restore,
-just to look around) is still planned but not written - see `AGENTS.md`.
+`homelab-reset` shows the checkpoint's timestamp and asks for confirmation
+before it arms anything. Read that timestamp: it's the only preview you get of
+what you're about to lose. It refuses outright if there is no checkpoint.
+
+There is no `homelab-rescue-shell` yet, so today the only way into the rescue
+system is `homelab-reset` (which commits to a restore) or booting it by hand.
 
 ### Safety gates on restore
 
-`homelab-restore` (installed into the rescue system, run by
-`rescue/homelab-restore.service` at boot) refuses to do anything unless
+`homelab-restore` runs on every rescue boot and refuses to do anything unless
 **all three** hold:
 
 1. `/etc/homelab-role` says `rescue` - we are not the live system
 2. this boot came via tryboot - it was deliberate
 3. the arm marker exists on bootB - a restore was actually requested
 
-`homelab-reset` is what sets up all three: it triggers the tryboot itself
-(gate 2) after arming the marker (gate 3), and the rescue system already
-carries the `rescue` role from when it was cloned (gate 1). Gate 3 is why a
-future `homelab-rescue-shell` would be safe: it would boot into rescue
-*without* arming, so you could inspect it without risking an overwrite on
-its next boot.
+`homelab-reset` sets up all three: the rescue system already carries its role
+from when it was cloned, and reset arms the marker and then triggers the
+tryboot itself.
 
-Note that the marker lives on **bootB**, not bootA. Each system mounts its
-own boot partition, so a marker on bootA would be invisible to the rescue
-system. `arm_restore()` in `lib/common.sh` (called by `homelab-reset`)
-mounts bootB explicitly to place it.
+The marker lives on **bootB**, not bootA. Each system mounts its own boot
+partition, so a marker on bootA would be invisible to the rescue system;
+`arm_restore()` in `lib/common.sh` mounts bootB explicitly to place it.
 
 ## Things to keep in mind
 
@@ -116,8 +108,8 @@ mounts bootB explicitly to place it.
 machine. Drift there quietly redefines what a reset restores to.
 
 **Service data belongs on `/data`.** Anything under `/opt` or `/var/lib` is in
-the reset scope and gets rolled back. The pattern in `20-paperless.sh` shows
-the split: config in `/opt`, state in `/data`.
+the reset scope and gets rolled back. `20-paperless.sh` shows the split: config
+in `/opt`, state in `/data`.
 
 **Keep one physical spare.** This protects against a broken system, not dead
 hardware. A second SD card with a known-good image in a drawer is the actual
@@ -127,22 +119,15 @@ disaster recovery answer.
 
 Do all of this before trusting it with anything:
 
-1. `sudo ./install.sh` on a freshly-imaged, not-yet-auto-expanded card.
-   Check `homelab-status` looks sane.
+1. `sudo ./install.sh` on a freshly-imaged, not-yet-auto-expanded card. Check
+   `homelab-status` looks sane.
 2. `sudo homelab-checkpoint`.
 3. Plain `sudo reboot` - confirm you land back on the live system
-   automatically. This proves the tryboot fail-safe (an ordinary reboot
-   never lands on rescue) independent of anything specific to this repo.
+   automatically. This proves the tryboot fail-safe independent of anything
+   specific to this repo. **Don't skip to step 4.**
 4. Only then: make a throwaway change (touch a file, install a package),
-   `sudo homelab-reset`, confirm it reboots, restores, and reboots back -
-   and that the throwaway change is gone while `/data` survived.
-
-Step 3 proves the fail-safe. Don't skip to step 4.
-
-There's no `homelab-rescue-shell` yet to poke around the rescue system
-*without* committing to a restore - right now, booting into rescue means a
-restore either happens (if armed) or it doesn't (if not), nothing in
-between beyond a normal shell.
+   `sudo homelab-reset`, confirm it reboots, restores, and reboots back - and
+   that the throwaway change is gone while `/data` survived.
 
 ## Adding a service
 

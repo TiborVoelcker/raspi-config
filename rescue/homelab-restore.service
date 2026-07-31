@@ -1,5 +1,8 @@
 [Unit]
 Description=Restore the live system from this rescue checkpoint, if armed
+# The arm marker lives on this system's own boot partition (bootB). Checking it
+# here is only a cheap first pass; restore.sh re-checks it along with the role
+# and tryboot gates.
 After=local-fs.target
 ConditionPathExists=/boot/firmware/homelab-restore.arm
 
@@ -7,6 +10,9 @@ ConditionPathExists=/boot/firmware/homelab-restore.arm
 Type=oneshot
 ExecStart=/usr/local/sbin/homelab-restore
 RemainAfterExit=yes
+# Type=oneshot already disables the start timeout; stated explicitly because a
+# rootfs rsync killed halfway leaves the live system unbootable.
+TimeoutStartSec=infinity
 
 [Install]
 WantedBy=multi-user.target
