@@ -115,6 +115,7 @@ be bootable.
 | `modules/02-data.sh` | Mounts the external disk at `/data` by UUID; makes Docker refuse to start unless it is genuinely mounted. |
 | `modules/03-upgrade.sh` | `apt-get update && upgrade`. |
 | `modules/11-docker.sh` | Docker Engine + Compose plugin from Debian's repos. |
+| `modules/12-claude-code.sh` | Claude Code, installed into `$SUDO_USER`'s home. |
 | `modules/20-paperless.sh` | The only service module so far, and the template for the rest. |
 | `bin/homelab-reset` | Arms the reset and triggers a tryboot. |
 | `bin/homelab-status` | Read-only snapshot: role, tryboot, partitions, `/data`, baseline age, armed? |
