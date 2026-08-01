@@ -14,10 +14,8 @@
 #
 # Only three things here differ from what rootA should hold: the partitions its
 # fstab and cmdline point at, the role file, and this reset machinery. Those
-# are what gets undone below, and anything added to 01-create-baseline.sh needs its
-# inverse here.
-#
-# The external data disk is never mounted here at all.
+# are what gets undone below, so anything added to 01-create-baseline.sh needs
+# its inverse here. The external data disk is never mounted at all.
 set -euo pipefail
 # Path must match $COMMON_LIB in lib/common.sh - it cannot be read from there
 # before that file is sourced.
@@ -25,10 +23,9 @@ set -euo pipefail
 source /usr/local/lib/homelab/common.sh
 
 LOG="$BOOT_DIR/homelab-reset.log"
-# One generation back rather than appending. The rsync progress below is
+# One generation back rather than appending: the rsync progress below is
 # written as carriage-return updates, which is a lot of bytes for a small FAT
-# partition to accumulate across resets, and a retry still has the previous
-# attempt to look at.
+# partition to accumulate across resets.
 [[ -f "$LOG" ]] && mv -f "$LOG" "$LOG.prev"
 exec > >(tee "$LOG") 2>&1
 header "homelab-reset-main $(date -Is)"
@@ -45,9 +42,8 @@ mkdir -p "$MAIN_ROOT_MNT" "$MAIN_BOOT_MNT"
 mountpoint -q "$MAIN_ROOT_MNT" || mount "$DEV_ROOT_A" "$MAIN_ROOT_MNT"
 mountpoint -q "$MAIN_BOOT_MNT" || mount "$DEV_BOOT_A" "$MAIN_BOOT_MNT"
 
-# progress2 so `tail -f` on the log shows the copy moving. It has no
-# newlines, so journalctl would hold it all back until the end - the log
-# file is the place to watch this from.
+# progress2 so `tail -f` on the log shows the copy moving. It has no newlines,
+# so journalctl holds it back until the end - watch the log file instead.
 rsync_live -aAXH --delete --info=progress2 "${RSYNC_EXCLUDES[@]}" / "$MAIN_ROOT_MNT/"
 make_runtime_dirs "$MAIN_ROOT_MNT"
 
