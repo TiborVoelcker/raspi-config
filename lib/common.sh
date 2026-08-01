@@ -18,6 +18,17 @@ confirm() {
     [[ "$reply" =~ ^[Yy]$ ]]
 }
 
+# apt with its output held back - a few hundred lines of dpkg chatter buries
+# everything else install.sh prints. The whole output is shown if it fails.
+apt_quiet() {
+    local out
+    if ! out=$(DEBIAN_FRONTEND=noninteractive \
+               apt-get -y -qq -o Dpkg::Use-Pty=0 "$@" 2>&1); then
+        printf '%s\n' "$out" >&2
+        die "apt-get $* failed"
+    fi
+}
+
 # ---------- guards ----------
 need_root() { [[ $EUID -eq 0 ]] || die "must run as root"; }
 
@@ -81,15 +92,22 @@ DATA_MARKER="$DATA_DIR/.homelab-data"
 # Works from either system - both boot off the same card.
 detect_disk() {
     local root_src pk
+    # -r throughout: lsblk pads its columns for human reading, and every value
+    # here is compared or concatenated rather than printed.
     root_src=$(findmnt -no SOURCE /) || die "cannot determine root source"
-    pk=$(lsblk -no PKNAME "$root_src" | head -1)
+    pk=$(lsblk -rno PKNAME "$root_src" | head -1)
     [[ -n "$pk" ]] || die "cannot determine parent disk of $root_src"
     DISK="/dev/$pk"
 
-    [[ "$(lsblk -no PTTYPE "$DISK" | head -1)" == "dos" ]] \
+    [[ "$(lsblk -rno PTTYPE "$DISK" | head -1)" == "dos" ]] \
         || die "partition table on $DISK is not MBR - see lib/common.sh layout notes"
 
-    DISK_ID=$(sfdisk --disk-id "$DISK" | sed 's/^0x//')
+    # An MBR disk id is exactly 8 hex digits. Checked rather than trusted
+    # because a malformed one would be written into fstab and cmdline as a
+    # PARTUUID, and the card would simply stop booting.
+    DISK_ID=$(sfdisk --disk-id "$DISK" | sed 's/^0x//' | tr -dc '0-9a-fA-F')
+    [[ "$DISK_ID" =~ ^[0-9a-fA-F]{8}$ ]] \
+        || die "cannot read the MBR disk id of $DISK (got '$DISK_ID')"
 
     local sep=""
     [[ "$DISK" =~ [0-9]$ ]] && sep="p"
