@@ -43,7 +43,7 @@ else
     # autoboot.txt is deliberately excluded: it is only ever read from the
     # first FAT partition, and a stale copy here would only cause confusion.
     rsync -a --exclude=autoboot.txt --exclude="$ARM_NAME" \
-        --exclude=homelab-reset.log \
+        --exclude='homelab-reset.log*' \
         "$BOOT_DIR/" "$BASELINE_BOOT_MNT/"
 
     set_cmdline_root "$BASELINE_BOOT_MNT/cmdline.txt" "$PART_ROOT_B"

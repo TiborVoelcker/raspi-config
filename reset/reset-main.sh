@@ -24,7 +24,13 @@ set -euo pipefail
 # shellcheck source=../lib/common.sh
 source /usr/local/lib/homelab/common.sh
 
-exec > >(tee -a "$BOOT_DIR/homelab-reset.log") 2>&1
+LOG="$BOOT_DIR/homelab-reset.log"
+# One generation back rather than appending. The rsync progress below is
+# written as carriage-return updates, which is a lot of bytes for a small FAT
+# partition to accumulate across resets, and a retry still has the previous
+# attempt to look at.
+[[ -f "$LOG" ]] && mv -f "$LOG" "$LOG.prev"
+exec > >(tee "$LOG") 2>&1
 echo "=== homelab-reset-main $(date -Is) ==="
 
 need_root
@@ -39,13 +45,16 @@ mkdir -p "$MAIN_ROOT_MNT" "$MAIN_BOOT_MNT"
 mountpoint -q "$MAIN_ROOT_MNT" || mount "$DEV_ROOT_A" "$MAIN_ROOT_MNT"
 mountpoint -q "$MAIN_BOOT_MNT" || mount "$DEV_BOOT_A" "$MAIN_BOOT_MNT"
 
-rsync -aAXH --delete "${RSYNC_EXCLUDES[@]}" / "$MAIN_ROOT_MNT/"
+# progress2 so `tail -f` on the log shows the copy moving. It has no
+# newlines, so journalctl would hold it all back until the end - the log
+# file is the place to watch this from.
+rsync -aAXH --delete --info=progress2 "${RSYNC_EXCLUDES[@]}" / "$MAIN_ROOT_MNT/"
 make_runtime_dirs "$MAIN_ROOT_MNT"
 
 # autoboot.txt is preserved: it lives only on bootA and drives the whole
 # mechanism. Overwriting it with a bootB copy would break the next reset.
 rsync -a --delete \
-    --exclude=autoboot.txt --exclude="$ARM_NAME" --exclude=homelab-reset.log \
+    --exclude=autoboot.txt --exclude="$ARM_NAME" --exclude='homelab-reset.log*' \
     "$BOOT_DIR/" "$MAIN_BOOT_MNT/"
 
 # ---- point the freshly written system back at p1/p2 ----
