@@ -6,7 +6,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 source "$REPO_DIR/lib/common.sh"
 
-need_root   # sfdisk --disk-id and the rescue mounts both need it
+need_root   # sfdisk --disk-id and the baseline mounts both need it
 detect_disk
 
 echo "role            $(current_role)"
@@ -23,12 +23,12 @@ else
 fi
 echo
 if [[ ! -b "$DEV_ROOT_B" ]]; then
-    echo "baseline        no rescue partition - run install.sh"
+    echo "baseline        rootB does not exist - run install.sh"
 else
-    mkdir -p "$RESCUE_ROOT_MNT"
-    if mount -o ro "$DEV_ROOT_B" "$RESCUE_ROOT_MNT" 2>/dev/null; then
-        stamp=$(cat "$RESCUE_ROOT_MNT$BASELINE_STAMP" 2>/dev/null || echo "")
-        umount "$RESCUE_ROOT_MNT"
+    mkdir -p "$BASELINE_ROOT_MNT"
+    if mount -o ro "$DEV_ROOT_B" "$BASELINE_ROOT_MNT" 2>/dev/null; then
+        stamp=$(cat "$BASELINE_ROOT_MNT$BASELINE_STAMP" 2>/dev/null || echo "")
+        umount "$BASELINE_ROOT_MNT"
 
         if [[ -z "$stamp" ]]; then
             echo "baseline        not captured - run install.sh"
@@ -40,8 +40,8 @@ else
             echo "baseline        $stamp"
         fi
     else
-        warn "cannot read the rescue partition (already mounted, or not formatted)"
+        warn "cannot read rootB (already mounted, or not formatted)"
     fi
-    restore_armed && warn "RESTORE ARMED - next tryboot will wipe the live system"
+    reset_armed && warn "RESET ARMED - next tryboot will wipe the live system"
 fi
-exit 0   # restore_armed returning "not armed" must not fail the script
+exit 0

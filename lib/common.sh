@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Shared helpers. Sourced by install.sh, every module, and - once installed
-# into the rescue system as $COMMON_LIB - by rescue/restore.sh.
+# into the baseline as $COMMON_LIB - by reset/reset-main.sh.
 
 set -euo pipefail
 
@@ -65,18 +65,18 @@ PART_ROOT_B=4
 BOOT_DIR=/boot/firmware
 DATA_DIR=/data
 
-RESCUE_ROOT_MNT=/mnt/rescue
-RESCUE_BOOT_MNT=/mnt/rescue-boot
+BASELINE_ROOT_MNT=/mnt/baseline
+BASELINE_BOOT_MNT=/mnt/baseline-boot
 MAIN_ROOT_MNT=/mnt/main
 MAIN_BOOT_MNT=/mnt/main-boot
 
-# Where the rescue system keeps its own copy of this file.
+# Where the baseline keeps its own copy of this file.
 COMMON_LIB=/usr/local/lib/homelab/common.sh
 
-# The rescue system looks for the arm marker on its own boot partition, which
-# is $BOOT_DIR only from INSIDE the rescue system. The live system reaches it
-# through arm_restore()/restore_armed() at the bottom.
-ARM_NAME=homelab-restore.arm
+# The baseline looks for the arm marker on its own boot partition, which
+# is $BOOT_DIR only from INSIDE the baseline. The live system reaches it
+# through arm_reset()/reset_armed() at the bottom.
+ARM_NAME=homelab-reset.arm
 ARM_MARKER="$BOOT_DIR/$ARM_NAME"
 
 # Written into the baseline when it is captured, and the proof that rootB holds
@@ -197,33 +197,40 @@ set_cmdline_root() {
     sed -i 's|\bresize\b||g; s|  *| |g; s|^ *||; s| *$||' "$cmdline"
 }
 
-# ---------- arming the restore, from the live system ----------
-# The rescue system looks for the arm marker on bootB, so the live system has
+# ---------- arming the reset, from the live system ----------
+# The baseline looks for the arm marker on bootB, so the live system has
 # to mount bootB to place or read it. Returns 1 rather than dying when there is
 # no bootB yet, so homelab-status can report on a half-provisioned card.
-_with_rescue_boot() {
+_with_baseline_boot() {
     local action="$1" mounted=0 rc=0
     [[ -b "${DEV_BOOT_B:?run detect_disk first}" ]] || return 1
 
-    mkdir -p "$RESCUE_BOOT_MNT"
-    if mountpoint -q "$RESCUE_BOOT_MNT"; then
+    mkdir -p "$BASELINE_BOOT_MNT"
+    if mountpoint -q "$BASELINE_BOOT_MNT"; then
         mounted=1
     else
         local opts=()
         [[ "$action" == check ]] && opts=(-o ro)
-        mount "${opts[@]}" "$DEV_BOOT_B" "$RESCUE_BOOT_MNT" \
-            || die "cannot mount rescue boot partition"
+        if ! mount "${opts[@]}" "$DEV_BOOT_B" "$BASELINE_BOOT_MNT" 2>/dev/null; then
+            # Arming has to fail loudly. Reporting must not: homelab-status is
+            # the tool you reach for when the card is in a state like this.
+            if [[ "$action" == check ]]; then
+                warn "cannot read bootB - whether a reset is armed is unknown"
+                return 1
+            fi
+            die "cannot mount the baseline boot partition"
+        fi
     fi
 
-    local marker="$RESCUE_BOOT_MNT/$ARM_NAME"
+    local marker="$BASELINE_BOOT_MNT/$ARM_NAME"
     case "$action" in
         arm)   touch "$marker"; sync ;;
         check) [[ -f "$marker" ]] || rc=1 ;;
     esac
 
-    (( mounted )) || umount "$RESCUE_BOOT_MNT"
+    (( mounted )) || umount "$BASELINE_BOOT_MNT"
     return "$rc"
 }
 
-arm_restore()   { _with_rescue_boot arm; }
-restore_armed() { _with_rescue_boot check; }
+arm_reset()   { _with_baseline_boot arm; }
+reset_armed() { _with_baseline_boot check; }

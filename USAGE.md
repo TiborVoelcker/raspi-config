@@ -68,7 +68,7 @@ sudo ./install.sh
 Re-run any time. Every module no-ops where its work is already done, so adding
 a module and re-running only does the new work.
 
-**Run it early.** `01-rescue.sh` captures the baseline from whatever state the
+**Run it early.** `01-create-baseline.sh` captures the baseline from whatever state the
 system is in at that moment, and never recaptures. Running `install.sh` on a
 freshly flashed card gives you a clean baseline; running it for the first time
 on a Pi you have been using for six months bakes those six months in
@@ -78,7 +78,7 @@ permanently.
 
 ```bash
 sudo homelab-status          # partitions, data disk, baseline age, armed?
-sudo homelab-reset           # wipe live, restore the pristine baseline
+sudo homelab-reset           # wipe live, overwrite with baseline
 ```
 
 Recovery is always the same two steps:
@@ -91,7 +91,7 @@ sudo ./install.sh            # rebuilds the homelab on top
 `homelab-reset` shows when the baseline was captured and asks for confirmation
 before it arms anything. It refuses outright if there is no baseline.
 
-After a reset, `02-data.sh` asks you to pick the data disk again - the restored
+After a reset, `02-data.sh` asks you to pick the data disk again - the reset
 system has no `/data` fstab entry, just like a freshly flashed card. Your
 documents are untouched on the disk; only the fstab line is rebuilt. Set
 `HOMELAB_DATA_UUID` to skip the prompt:
@@ -120,27 +120,27 @@ sudo ./install.sh
 Whatever is on the live system at that moment becomes the new baseline, so do
 it from a system that is as close to freshly-flashed as you can manage.
 
-### Safety gates on restore
+### Safety gates on a reset
 
-`homelab-restore` runs on every baseline boot and refuses to do anything unless
+`homelab-reset-main` runs on every baseline boot and refuses to do anything unless
 **all three** hold:
 
-1. `/etc/homelab-role` says `rescue` - we are not the live system
+1. `/etc/homelab-role` says `baseline` - we are not the live system
 2. this boot came via tryboot - it was deliberate
-3. the arm marker exists on bootB - a restore was actually requested
+3. the arm marker exists on bootB - a reset was actually requested
 
 `homelab-reset` sets up all three: the baseline carries its role from when it
 was captured, and reset arms the marker and then triggers the tryboot itself.
 
 The marker lives on **bootB**, not bootA. Each system mounts its own boot
 partition, so a marker on bootA would be invisible to the baseline;
-`arm_restore()` in `lib/common.sh` mounts bootB explicitly to place it.
+`arm_reset()` in `lib/common.sh` mounts bootB explicitly to place it.
 
-To disarm by hand - say a restore failed partway and you want to stop it
+To disarm by hand - say a reset failed partway and you want to stop it
 retrying:
 
 ```bash
-sudo mount /dev/mmcblk0p3 /mnt && sudo rm /mnt/homelab-restore.arm && sudo umount /mnt
+sudo mount /dev/mmcblk0p3 /mnt && sudo rm /mnt/homelab-reset.arm && sudo umount /mnt
 ```
 
 ## Looking at the baseline
@@ -152,11 +152,33 @@ sudo mount /dev/mmcblk0p4 /mnt      # rootB
 sudo mount /dev/mmcblk0p3 /mnt/boot/firmware
 ```
 
-Booting it directly is safe - without an arm marker the restore service exits
+Booting it directly is safe - without an arm marker the reset service exits
 immediately.
 
-The restore log from the last reset is on bootB as `homelab-restore.log`, the
-first place to look if a reset did not do what you expected.
+## Watching a reset
+
+The baseline keeps the live system's hostname, address and SSH host keys, so
+you can log in while it works:
+
+```bash
+sudo tail -f /boot/firmware/homelab-reset.log
+```
+
+The rootfs copy reports progress, so that line moves. Your session drops when
+it finishes and reboots - that is how you know it is done.
+
+`journalctl -u homelab-reset-main -f` shows the same output, except for the
+progress, which has no line breaks for the journal to split on and so arrives
+all at once at the end.
+
+Afterwards the log is on bootB, which the live system does not mount:
+
+```bash
+sudo mount /dev/mmcblk0p3 /mnt && cat /mnt/homelab-reset.log
+```
+
+The reset before it is kept alongside as `homelab-reset.log.prev`. These are
+the first place to look if a reset did not do what you expected.
 
 ## Things to keep in mind
 
@@ -182,7 +204,7 @@ Do all of this before trusting it with anything:
    automatically. This proves the tryboot fail-safe independent of anything
    specific to this repo. **Don't skip to step 3.**
 3. Only then: make a throwaway change (touch a file, install a package),
-   `sudo homelab-reset`, confirm it reboots, restores, and reboots back - and
+   `sudo homelab-reset`, confirm it reboots, resets, and reboots back - and
    that the throwaway change is gone while `/data` survived.
 4. `sudo ./install.sh` again and confirm you get the working homelab back. This
    is the half that makes a reset survivable, so test it as deliberately as the
