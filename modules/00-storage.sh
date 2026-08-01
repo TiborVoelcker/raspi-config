@@ -48,7 +48,7 @@ else
   BEFORE the first boot delete this token from cmdline.txt on the small FAT
   partition (leave the rest of the line alone):
 
-      init=/usr/lib/raspberrypi-sys-mods/firstboot
+      resize
 
   Then boot and re-run install.sh. See USAGE.md, "Before first boot".
 

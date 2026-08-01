@@ -172,9 +172,11 @@ BASELINE_STALE_DAYS=730
 set_cmdline_root() {
     local cmdline="$1" rootn="$2"
     sed -i "s|root=PARTUUID=[^[:space:]]*|root=PARTUUID=$(partuuid_for "$rootn")|" "$cmdline"
-    # First-boot machinery must never fire again on either system.
-    sed -i 's|init=/usr/lib/raspberrypi-sys-mods/firstboot||g; s|systemd\.run[^[:space:]]*||g' \
-        "$cmdline"
+
+    # The first-boot auto-expand must never fire again on either system: the
+    # only free space it could grow the root partition into is where p3/p4
+    # live. Word-bounded, so noresize and resize2fs_once= are left alone.
+    sed -i 's|\bresize\b||g; s|  *| |g; s|^ *||; s| *$||' "$cmdline"
 }
 
 # ---------- arming the restore, from the live system ----------

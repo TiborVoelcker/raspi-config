@@ -41,15 +41,18 @@ auto-expands the root partition on first boot that space is gone for good.
 
 Flash with Raspberry Pi Imager as usual (customisation is fine), then
 **before the first boot** mount the small FAT partition on your laptop and
-delete this token from `cmdline.txt`:
+delete the `resize` token from `cmdline.txt` - the one near the end here:
 
 ```
-init=/usr/lib/raspberrypi-sys-mods/firstboot
+console=serial0,115200 console=tty1 root=PARTUUID=041bba91-02 rootfstype=ext4 fsck.repair=yes rootwait resize cfg80211.ieee80211_regdom=DE
 ```
 
-Leave the rest of the line alone - Imager's own customisation runs through a
-separate `systemd.run=` mechanism and keeps working. Check afterwards with
-`lsblk` that `p2` is roughly image-sized rather than card-sized.
+Leave the rest of the line alone. Imager's own customisation is applied through
+`custom.toml` and keeps working. Anything baked into the line itself, like the
+`cfg80211.ieee80211_regdom=DE` above, is a real setting and must stay.
+
+Check afterwards with `lsblk` that `p2` is roughly image-sized rather than
+card-sized.
 
 If you forget, `install.sh` refuses to touch the partition table and tells you
 to re-image rather than improvising.
