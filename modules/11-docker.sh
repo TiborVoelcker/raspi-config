@@ -2,7 +2,7 @@
 # Install Docker Engine + the Compose plugin from Debian's own repos - no
 # third-party apt source or curl-pipe-to-shell needed.
 #
-# Like everything after 01-rescue.sh, this never reaches the baseline, so a
+# Like everything after 01-create-baseline.sh, this never reaches the baseline, so a
 # reset removes Docker entirely and the next install.sh puts it back.
 set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"

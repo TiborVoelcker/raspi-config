@@ -8,7 +8,7 @@ inside a single file.
 ## What we're trying to achieve
 
 Reproducible, script-driven provisioning for a Raspberry Pi homelab, plus a
-self-hosted "reset button": if the live system gets into a bad state, put back
+self-hosted "reset button": if the live system gets into a bad state, restore
 a pristine copy of the flashed OS - no second computer, no fresh SD card, no
 physical access beyond a reboot.
 
@@ -21,7 +21,7 @@ bad state -> homelab-reset -> pristine baseline -> install.sh -> working homelab
 fresh card                 -> pristine baseline -> install.sh -> working homelab
 ```
 
-Those two rows must stay interchangeable. Anything that makes a restored system
+Those two rows must stay interchangeable. Anything that makes a reset system
 differ from a freshly flashed one is a bug.
 
 Two mechanisms make it work:
@@ -40,7 +40,7 @@ disk**, so a reset never touches it.
 ## The baseline
 
 A copy of the system **exactly as it came off the SD card image**, captured
-once by `01-rescue.sh` before any other module runs, then left alone. No
+once by `01-create-baseline.sh` before any other module runs, then left alone. No
 `/data` mount, no apt upgrade, no Docker, no services. Because it is never
 refreshed it cannot drift, and cannot accumulate whatever you are resetting to
 escape.
@@ -53,7 +53,7 @@ Worth knowing:
 - The baseline ages: it is never apt-upgraded. `03-upgrade.sh` runs on every
   `install.sh`, so the system you land on is current regardless. After a Debian
   major release upgrade, recapture it - see `USAGE.md`.
-- It is booted only to run the restore. To look at it or change it, mount `p4`
+- It is booted only to run the reset. To look at it or change it, mount `p4`
   from the live system.
 
 ## How it's wired together
@@ -100,7 +100,7 @@ and cannot be set by a cold boot, so an ordinary reboot or a power cut always
 lands back on bootA with no action needed - that's the fail-safe the whole
 design leans on.
 
-The restore boots into the baseline because you cannot rsync over the
+The reset boots into the baseline because you cannot rsync over the
 filesystem you are running from. That is the only reason the baseline needs to
 be bootable.
 
@@ -108,31 +108,31 @@ be bootable.
 
 | Path | Role |
 | --- | --- |
-| `install.sh` | Entry point: runs `modules/*.sh` in order, then symlinks `bin/` into `/usr/local/sbin`. |
-| `lib/common.sh` | Sourced by everything, including `restore.sh` inside the baseline. Output helpers, guards, layout constants, copy primitives. |
+| `install.sh` | Entry point: symlinks `bin/` into `/usr/local/sbin`, then runs `modules/*.sh` in order. |
+| `lib/common.sh` | Sourced by everything, including `reset-main.sh` inside the baseline. Output helpers, guards, layout constants, copy primitives. |
 | `modules/00-storage.sh` | Carves `p3`/`p4` out of unallocated space. |
-| `modules/01-rescue.sh` | Captures the baseline onto `p3`/`p4`, once; writes `autoboot.txt`. |
+| `modules/01-create-baseline.sh` | Captures the baseline onto `p3`/`p4`, once; writes `autoboot.txt`. |
 | `modules/02-data.sh` | Mounts the external disk at `/data` by UUID; makes Docker refuse to start unless it is genuinely mounted. |
 | `modules/03-upgrade.sh` | `apt-get update && upgrade`. |
 | `modules/11-docker.sh` | Docker Engine + Compose plugin from Debian's repos. |
 | `modules/20-paperless.sh` | The only service module so far, and the template for the rest. |
-| `bin/homelab-reset` | Arms the restore and triggers a tryboot. |
+| `bin/homelab-reset` | Arms the reset and triggers a tryboot. |
 | `bin/homelab-status` | Read-only snapshot: role, tryboot, partitions, `/data`, baseline age, armed? |
-| `rescue/restore.sh` | Installed into the baseline as `/usr/local/sbin/homelab-restore`. Overwrites `p1`/`p2` with itself, behind three gates. |
-| `rescue/homelab-restore.service` | Runs `restore.sh` at boot on the baseline. |
+| `reset/reset-main.sh` | Installed into the baseline as `/usr/local/sbin/homelab-reset-main`. Overwrites `p1`/`p2` with itself, behind three gates. |
+| `reset/homelab-reset-main.service` | Runs `reset-main.sh` at boot on the baseline. |
 
-**Module numbering is load-bearing.** `01-rescue.sh` captures the baseline, so
+**Module numbering is load-bearing.** `01-create-baseline.sh` captures the baseline, so
 everything numbered after it is by definition absent from that baseline. A new
 module that must survive a reset does not exist - put its state on `/data`
 instead.
 
-### The capture/restore pair
+### The capture/reset pair
 
-`01-rescue.sh` makes three changes to the clone: retarget its fstab at p3/p4,
-write `rescue` to the role file, and install the restore machinery.
-`rescue/restore.sh` undoes exactly those on the way back, plus the cmdline.
+`01-create-baseline.sh` makes three changes to the clone: retarget its fstab at p3/p4,
+write `baseline` to the role file, and install the reset machinery.
+`reset/reset-main.sh` undoes exactly those on the way back, plus the cmdline.
 **Change one and check the other** - an edit with no inverse is silently
-inherited by the restored live system.
+inherited by the live system after a reset.
 
 That list is also the complete set of ways the baseline differs from a freshly
 flashed card, which is why it is worth keeping short.
@@ -149,11 +149,11 @@ the one that must not be skipped.
   else treated as disposable by a reset.
 - Never regenerate a secret that already exists on disk - that orphans whatever
   data was encrypted or keyed with the old one.
-- Keep the baseline minimal. Every addition is a way a restored system can
+- Keep the baseline minimal. Every addition is a way a reset system can
   differ from a freshly flashed one.
-- `restore.sh` runs from a copy of `lib/common.sh` installed at
+- `reset-main.sh` runs from a copy of `lib/common.sh` installed at
   `/usr/local/lib/homelab/common.sh`. A new `common.sh` helper that assumes it
-  is running on the live system will break the restore side.
+  is running on the live system will break the reset side.
 - Write docs and comments for someone seeing this repo for the first time.
   Explain what is here and why it works this way; leave what it replaced to the
   commit history.

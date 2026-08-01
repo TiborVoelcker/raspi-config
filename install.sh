@@ -8,7 +8,7 @@ source "$REPO_DIR/lib/common.sh"
 
 need_root
 
-if [[ "$(current_role)" == "rescue" ]]; then
+if [[ "$(current_role)" == "baseline" ]]; then
     die "this is the baseline system - do not provision from here (see README)"
 fi
 echo main > "$ROLE_FILE"
