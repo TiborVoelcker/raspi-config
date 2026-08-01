@@ -155,8 +155,30 @@ sudo mount /dev/mmcblk0p3 /mnt/boot/firmware
 Booting it directly is safe - without an arm marker the reset service exits
 immediately.
 
-The log from the last reset is on bootB as `homelab-reset.log`, the
-first place to look if a reset did not do what you expected.
+## Watching a reset
+
+The baseline keeps the live system's hostname, address and SSH host keys, so
+you can log in while it works:
+
+```bash
+sudo tail -f /boot/firmware/homelab-reset.log
+```
+
+The rootfs copy reports progress, so that line moves. Your session drops when
+it finishes and reboots - that is how you know it is done.
+
+`journalctl -u homelab-apply-reset -f` shows the same output, except for the
+progress, which has no line breaks for the journal to split on and so arrives
+all at once at the end.
+
+Afterwards the log is on bootB, which the live system does not mount:
+
+```bash
+sudo mount /dev/mmcblk0p3 /mnt && cat /mnt/homelab-reset.log
+```
+
+The reset before it is kept alongside as `homelab-reset.log.prev`. These are
+the first place to look if a reset did not do what you expected.
 
 ## Things to keep in mind
 
