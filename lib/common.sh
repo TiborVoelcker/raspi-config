@@ -18,6 +18,17 @@ confirm() {
     [[ "$reply" =~ ^[Yy]$ ]]
 }
 
+# apt with its output held back - a few hundred lines of dpkg chatter buries
+# everything else install.sh prints. The whole output is shown if it fails.
+apt_quiet() {
+    local out
+    if ! out=$(DEBIAN_FRONTEND=noninteractive \
+               apt-get -y -qq -o Dpkg::Use-Pty=0 "$@" 2>&1); then
+        printf '%s\n' "$out" >&2
+        die "apt-get $* failed"
+    fi
+}
+
 # ---------- guards ----------
 need_root() { [[ $EUID -eq 0 ]] || die "must run as root"; }
 
