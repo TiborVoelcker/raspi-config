@@ -211,8 +211,15 @@ _with_baseline_boot() {
     else
         local opts=()
         [[ "$action" == check ]] && opts=(-o ro)
-        mount "${opts[@]}" "$DEV_BOOT_B" "$BASELINE_BOOT_MNT" \
-            || die "cannot mount baseline boot partition"
+        if ! mount "${opts[@]}" "$DEV_BOOT_B" "$BASELINE_BOOT_MNT" 2>/dev/null; then
+            # Arming has to fail loudly. Reporting must not: homelab-status is
+            # the tool you reach for when the card is in a state like this.
+            if [[ "$action" == check ]]; then
+                warn "cannot read bootB - whether a reset is armed is unknown"
+                return 1
+            fi
+            die "cannot mount the baseline boot partition"
+        fi
     fi
 
     local marker="$BASELINE_BOOT_MNT/$ARM_NAME"

@@ -7,7 +7,7 @@ source "$REPO_DIR/lib/common.sh"
 need_root
 need_tryboot_support
 detect_disk
-[[ -b "$DEV_ROOT_B" ]] || die "no baseline partition"
+[[ -b "$DEV_ROOT_B" ]] || die "rootB does not exist - run install.sh first"
 [[ -f "$BOOT_DIR/autoboot.txt" ]] || die "autoboot.txt missing - run install.sh first"
 
 # Refuse without a readable stamp. An unpopulated rootB would tryboot into a
@@ -19,7 +19,7 @@ if mount -o ro "$DEV_ROOT_B" "$BASELINE_ROOT_MNT" 2>/dev/null; then
     stamp=$(cat "$BASELINE_ROOT_MNT$BASELINE_STAMP" 2>/dev/null || echo "")
     umount "$BASELINE_ROOT_MNT"
 fi
-[[ -n "$stamp" ]] || die "no baseline on the baseline partition - run install.sh first"
+[[ -n "$stamp" ]] || die "no baseline captured yet - run install.sh first"
 
 age=""
 if days=$(age_days "$stamp"); then
@@ -36,7 +36,7 @@ echo "    to rebuild the homelab."
 echo
 confirm "Type y to reset" || die "cancelled"
 
-arm_reset
+arm_reset || die "could not arm the reset - nothing has been changed"
 
 ok "armed - rebooting into the baseline"
 sleep 2

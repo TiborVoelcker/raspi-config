@@ -23,7 +23,7 @@ else
 fi
 echo
 if [[ ! -b "$DEV_ROOT_B" ]]; then
-    echo "baseline        no baseline partition - run install.sh"
+    echo "baseline        rootB does not exist - run install.sh"
 else
     mkdir -p "$BASELINE_ROOT_MNT"
     if mount -o ro "$DEV_ROOT_B" "$BASELINE_ROOT_MNT" 2>/dev/null; then
@@ -40,7 +40,7 @@ else
             echo "baseline        $stamp"
         fi
     else
-        warn "cannot read the baseline partition (already mounted, or not formatted)"
+        warn "cannot read rootB (already mounted, or not formatted)"
     fi
     reset_armed && warn "RESET ARMED - next tryboot will wipe the live system"
 fi

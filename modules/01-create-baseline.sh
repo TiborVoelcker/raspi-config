@@ -29,7 +29,7 @@ need_root
 need_cmd rsync
 detect_disk
 [[ -b "$DEV_BOOT_B" && -b "$DEV_ROOT_B" ]] \
-    || die "no baseline partitions - 00-storage.sh should have created them"
+    || die "p3/p4 do not exist - 00-storage.sh should have created them"
 
 mkdir -p "$BASELINE_BOOT_MNT" "$BASELINE_ROOT_MNT"
 mountpoint -q "$BASELINE_BOOT_MNT" || mount "$DEV_BOOT_B" "$BASELINE_BOOT_MNT"
