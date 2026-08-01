@@ -167,7 +167,7 @@ sudo tail -f /boot/firmware/homelab-reset.log
 The rootfs copy reports progress, so that line moves. Your session drops when
 it finishes and reboots - that is how you know it is done.
 
-`journalctl -u homelab-apply-reset -f` shows the same output, except for the
+`journalctl -u homelab-reset-main -f` shows the same output, except for the
 progress, which has no line breaks for the journal to split on and so arrives
 all at once at the end.
 
