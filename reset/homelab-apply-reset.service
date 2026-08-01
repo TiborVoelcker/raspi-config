@@ -1,14 +1,14 @@
 [Unit]
-Description=Restore the live system from the pristine baseline, if armed
+Description=Reset the live system to the pristine baseline, if armed
 # The arm marker lives on this system's own boot partition (bootB). Checking it
-# here is only a cheap first pass; restore.sh re-checks it along with the role
+# here is only a cheap first pass; apply.sh re-checks it along with the role
 # and tryboot gates.
 After=local-fs.target
-ConditionPathExists=/boot/firmware/homelab-restore.arm
+ConditionPathExists=/boot/firmware/homelab-reset.arm
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/homelab-restore
+ExecStart=/usr/local/sbin/homelab-apply-reset
 RemainAfterExit=yes
 # Type=oneshot already disables the start timeout; stated explicitly because a
 # rootfs rsync killed halfway leaves the live system unbootable.

@@ -109,8 +109,8 @@ EOF
     [[ -b "$DEV_BOOT_B" && -b "$DEV_ROOT_B" ]] \
         || die "kernel did not pick up new partitions - reboot and re-run"
 
-    mkfs.vfat -F 32 -n RESCUEBOOT "$DEV_BOOT_B" >/dev/null
-    mkfs.ext4 -q -L rescue "$DEV_ROOT_B"
+    mkfs.vfat -F 32 -n bootbase "$DEV_BOOT_B" >/dev/null
+    mkfs.ext4 -q -L rootbase "$DEV_ROOT_B"
     ok "created and formatted $DEV_BOOT_B and $DEV_ROOT_B"
 fi
 

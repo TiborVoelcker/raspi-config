@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Upgrade the OS.
 #
-# Numbered AFTER 01-rescue.sh: the baseline matches the flashed image, which is
+# Numbered AFTER 01-baseline.sh: the baseline matches the flashed image, which is
 # not upgraded either. Since this runs on every install.sh, a reset followed by
 # install.sh lands on an up-to-date system however old the baseline is.
 set -euo pipefail
