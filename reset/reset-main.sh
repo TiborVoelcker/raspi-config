@@ -48,7 +48,7 @@ mountpoint -q "$MAIN_BOOT_MNT" || mount "$DEV_BOOT_A" "$MAIN_BOOT_MNT"
 # progress2 so `tail -f` on the log shows the copy moving. It has no
 # newlines, so journalctl would hold it all back until the end - the log
 # file is the place to watch this from.
-rsync -aAXH --delete --info=progress2 "${RSYNC_EXCLUDES[@]}" / "$MAIN_ROOT_MNT/"
+rsync_live -aAXH --delete --info=progress2 "${RSYNC_EXCLUDES[@]}" / "$MAIN_ROOT_MNT/"
 make_runtime_dirs "$MAIN_ROOT_MNT"
 
 # autoboot.txt is preserved: it lives only on bootA and drives the whole
