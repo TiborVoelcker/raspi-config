@@ -19,7 +19,10 @@ else
     [[ -b "$DEV_BOOT_B" || -b "$DEV_ROOT_B" ]] \
         && die "partial layout: one of p3/p4 exists. Resolve by hand before continuing."
 
-    root_part_num=$(lsblk -no PARTN "$(findmnt -no SOURCE /)" 2>/dev/null || echo "")
+    # PARTN is a numeric column, so lsblk right-aligns it and pads on the left.
+    # Strip everything but the digits or the comparison below never matches.
+    root_part_num=$(lsblk -rno PARTN "$(findmnt -no SOURCE /)" 2>/dev/null \
+        | tr -dc '0-9' || true)
     [[ "$root_part_num" == "$PART_ROOT_A" ]] \
         || die "root is partition ${root_part_num:-?}, expected $PART_ROOT_A - unexpected layout"
 
