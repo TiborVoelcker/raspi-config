@@ -17,6 +17,18 @@ log "raspi-homelab provisioning"
 echo "    storage and the baseline first; everything else on top"
 echo
 
+# Before the modules, so homelab-status is on PATH to diagnose whichever one
+# fails. They are symlinks into the repo, so they cost nothing and need no
+# reinstalling when the repo is updated.
+log "installing helper commands"
+for helper in "$REPO_DIR"/bin/*; do
+    [[ -f "$helper" ]] || continue
+    name=$(basename "$helper")
+    ln -sfn "$helper" "/usr/local/sbin/$name"
+    ok "$name -> /usr/local/sbin/$name"
+done
+echo
+
 for module in "$REPO_DIR"/modules/*.sh; do
     [[ -e "$module" ]] || continue
     name=$(basename "$module")
@@ -25,15 +37,6 @@ for module in "$REPO_DIR"/modules/*.sh; do
     echo
 done
 
-log "installing helper commands"
-for helper in "$REPO_DIR"/bin/*; do
-    [[ -f "$helper" ]] || continue
-    name=$(basename "$helper")
-    ln -sfn "$helper" "/usr/local/sbin/$name"
-    ok "$name -> /usr/local/sbin/$name"
-done
-
-echo
 ok "done"
 echo
 echo "  homelab-reset        wipe this system back to the pristine baseline"
