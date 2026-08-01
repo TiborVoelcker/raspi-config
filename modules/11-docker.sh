@@ -14,9 +14,9 @@ else
     ok "installed docker.io + docker-compose"
 fi
 
-# Service modules all use `docker compose`, so the plugin has to be wired in.
-# A package providing only a standalone docker-compose binary would install
-# cleanly and then fail in 20-paperless.sh instead of here.
+# Service modules all use `docker compose`. A package providing only the
+# standalone docker-compose binary would install cleanly and then fail in
+# 20-paperless.sh instead of here.
 docker compose version >/dev/null 2>&1 \
     || die "'docker compose' is not available - the installed compose package does not provide the CLI plugin"
 

@@ -4,15 +4,15 @@
 #
 #   p1 bootA | p2 rootA .... grows .... | p3 bootB | p4 rootB
 #
-# bootB and rootB are placed at the very END of the card, so the free space
-# lands between rootA and bootB where rootA can grow into it. rootB is only
-# ever a copy of the pristine flashed system, so it needs no more room than the
-# image's own root partition; everything beyond that belongs to the live system.
+# bootB and rootB go at the very END of the card, so the free space lands
+# between rootA and bootB where rootA can grow into it. rootB only ever holds a
+# copy of the flashed system, so it needs no more room than the image's own
+# root partition.
 #
 # All of this runs on the mounted, running system: partitions can be added
-# while others are in use, a partition can be extended in place, and ext4 grows
-# online. It cannot be SHRUNK, which is why this hard-fails if Raspberry Pi OS
-# already auto-expanded p2 to fill the card. See USAGE.md, "Before first boot".
+# while others are in use, and ext4 grows online. It cannot be SHRUNK, which is
+# why this hard-fails if Raspberry Pi OS already auto-expanded p2 to fill the
+# card. See README.md, "Before first boot".
 set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"
 
@@ -22,9 +22,8 @@ need_cmd sfdisk partx blockdev udevadm mkfs.ext4 mkfs.vfat resize2fs \
 need_tryboot_support
 detect_disk
 
-                                       # -- : sizes can come out negative on a
-                                       # card with no room, and numfmt would
-                                       # read the leading - as an option
+# -- : sizes come out negative on a card with no room, and numfmt would read
+# the leading - as an option.
 human()     { numfmt --to=iec -- "$(( $1 * 512 ))"; }
 part_start() { partx -g -o START --nr "$1" "$DISK" | tr -dc '0-9'; }
 part_end()   { partx -g -o END   --nr "$1" "$DISK" | tr -dc '0-9'; }
@@ -39,8 +38,8 @@ else
     [[ -b "$DEV_BOOT_B" || -b "$DEV_ROOT_B" ]] \
         && die "partial layout: one of p3/p4 exists. Resolve by hand before continuing."
 
-    # PARTN is a numeric column, so lsblk right-aligns it and pads on the left.
-    # Strip everything but the digits or the comparison below never matches.
+    # PARTN is right-aligned and padded, so strip everything but the digits or
+    # the comparison below never matches.
     root_part_num=$(lsblk -rno PARTN "$(findmnt -no SOURCE /)" 2>/dev/null \
         | tr -dc '0-9' || true)
     [[ "$root_part_num" == "$PART_ROOT_A" ]] \
@@ -77,7 +76,7 @@ else
         echo
         log '    resize'
         echo
-        log 'Then boot and re-run install.sh. See USAGE.md, "Before first boot".'
+        log 'Then boot and re-run install.sh. See README.md, "Before first boot".'
         echo
         die "aborting before touching the partition table"
     fi
@@ -85,16 +84,15 @@ else
     warn "about to write the partition table on $DISK"
     confirm "      proceed?" || die "cancelled"
 
-    # type=c is W95 FAT32 (LBA), matching the stock Pi boot partition.
-    # type=83 is Linux.
+    # type=c is W95 FAT32 (LBA), matching the stock Pi boot partition; type=83
+    # is Linux.
     #
-    # --no-reread: p1/p2 are mounted - we are running from p2 - so sfdisk's
-    #   "is anyone using this disk" check fails and it refuses to write.
-    # --no-tell-kernel: for the same reason the kernel cannot re-read the whole
-    #   table; partx below adds the new partitions on their own instead.
-    # -W always: wipe any filesystem signature left in the tail of the card by
-    #   a previous image. Otherwise sfdisk stops to ask whether to remove it,
-    #   and reads the answer from the heredoc feeding it.
+    # --no-reread / --no-tell-kernel: we are running from p2, so sfdisk refuses
+    #   to write and the kernel cannot re-read the table. partx below picks up
+    #   the new partitions instead.
+    # -W always: wipe any filesystem signature a previous image left in the
+    #   tail of the card. Otherwise sfdisk stops to ask, and reads the answer
+    #   from the heredoc feeding it.
     sfdisk --no-reread --no-tell-kernel -W always --append "$DISK" >/dev/null <<EOF
 start=${boot_b_start}, size=${boot_sectors}, type=c
 start=${root_b_start}, size=${root_sectors}, type=83
@@ -121,9 +119,8 @@ boot_b_start=$(part_start "$PART_BOOT_B")
 
 if (( root_a_end + 1 < boot_b_start )); then
     log "growing rootA to $(human $(( boot_b_start - root_a_start )))"
-    # -N edits one partition entry and leaves the others alone. Only the size
-    # changes; the start is passed back unchanged so the filesystem stays
-    # exactly where it is.
+    # -N edits one partition entry and leaves the others alone. The start is
+    # passed back unchanged so the filesystem stays exactly where it is.
     echo "start=${root_a_start}, size=$(( boot_b_start - root_a_start ))" \
         | sfdisk --no-reread --no-tell-kernel -N "$PART_ROOT_A" "$DISK" >/dev/null
     partx -u "$DISK"

@@ -63,9 +63,8 @@ MAIN_BOOT_MNT=/mnt/main-boot
 # Where the baseline keeps its own copy of this file.
 COMMON_LIB=/usr/local/lib/homelab/common.sh
 
-# The baseline looks for the arm marker on its own boot partition, which
-# is $BOOT_DIR only from INSIDE the baseline. The live system reaches it
-# through arm_reset()/reset_armed() at the bottom.
+# $BOOT_DIR resolves to bootB only from INSIDE the baseline; the live system
+# reaches the marker through arm_reset()/reset_armed() at the bottom.
 ARM_NAME=homelab-reset.arm
 ARM_MARKER="$BOOT_DIR/$ARM_NAME"
 
@@ -82,8 +81,7 @@ DATA_MARKER="$DATA_DIR/.homelab-data"
 # Works from either system - both boot off the same card.
 detect_disk() {
     local root_src pk
-    # -r throughout: lsblk pads its columns for human reading, and every value
-    # here is compared or concatenated rather than printed.
+    # -r throughout: without it lsblk pads its columns for human reading.
     root_src=$(findmnt -no SOURCE /) || die "cannot determine root source"
     pk=$(lsblk -rno PKNAME "$root_src" | head -1)
     [[ -n "$pk" ]] || die "cannot determine parent disk of $root_src"
@@ -92,9 +90,8 @@ detect_disk() {
     [[ "$(lsblk -rno PTTYPE "$DISK" | head -1)" == "dos" ]] \
         || die "partition table on $DISK is not MBR - see lib/common.sh layout notes"
 
-    # An MBR disk id is exactly 8 hex digits. Checked rather than trusted
-    # because a malformed one would be written into fstab and cmdline as a
-    # PARTUUID, and the card would simply stop booting.
+    # An MBR disk id is exactly 8 hex digits. A malformed one would be written
+    # into fstab and cmdline as a PARTUUID, and the card would stop booting.
     DISK_ID=$(sfdisk --disk-id "$DISK" | sed 's/^0x//' | tr -dc '0-9a-fA-F')
     [[ "$DISK_ID" =~ ^[0-9a-fA-F]{8}$ ]] \
         || die "cannot read the MBR disk id of $DISK (got '$DISK_ID')"
@@ -166,8 +163,7 @@ age_days() {
     echo $(( ($(date +%s) - at) / 86400 ))
 }
 
-# Days -> "14 months ago". The singular cases are named, so the numbered ones
-# are always plural.
+# Days -> "14 months ago".
 human_age() {
     local days="$1"
     if   (( days <   0 )); then echo "in the future"
@@ -179,9 +175,8 @@ human_age() {
     fi
 }
 
-# Past roughly two years a Debian release stops being current, and the
-# baseline's apt sources can stop resolving - at which point a reset leaves a
-# system install.sh cannot build on.
+# Past roughly two years the baseline's apt sources can stop resolving, at
+# which point a reset leaves a system install.sh cannot build on.
 BASELINE_STALE_DAYS=730
 
 # Point a boot partition's cmdline.txt at a given root partition.
@@ -196,9 +191,9 @@ set_cmdline_root() {
 }
 
 # ---------- arming the reset, from the live system ----------
-# The baseline looks for the arm marker on bootB, so the live system has
-# to mount bootB to place or read it. Returns 1 rather than dying when there is
-# no bootB yet, so homelab-status can report on a half-provisioned card.
+# The marker lives on bootB, so the live system has to mount it to place or
+# read it. Returns 1 rather than dying when there is no bootB yet, so
+# homelab-status can report on a half-provisioned card.
 _with_baseline_boot() {
     local action="$1" mounted=0 rc=0
     [[ -b "${DEV_BOOT_B:?run detect_disk first}" ]] || return 1
