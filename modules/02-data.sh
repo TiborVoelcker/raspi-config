@@ -35,18 +35,18 @@ else
         [[ ${#candidates[@]} -gt 0 ]] \
             || die "no external partitions found - plug in the data disk and re-run"
 
-        echo "  external partitions found:"
+        log "external partitions found:"
         for i in "${!candidates[@]}"; do
-            printf '    [%d] %s\n' "$i" "${candidates[$i]}"
+            log "$(printf '  [%d] %s' "$i" "${candidates[$i]}")"
         done
         echo
-        echo "  Pick the partition to mount at $DATA_DIR."
-        echo "  This script never formats anything - format it yourself first with:"
-        echo "      sudo mkfs.ext4 -L homelab-data /dev/sdXN"
-        echo "  ext4 is required; exFAT and NTFS cannot store Unix ownership,"
-        echo "  which container volumes need."
+        log "Pick the partition to mount at $DATA_DIR."
+        log "This script never formats anything - format it yourself first with:"
+        log "    sudo mkfs.ext4 -L homelab-data /dev/sdXN"
+        log "ext4 is required; exFAT and NTFS cannot store Unix ownership,"
+        log "which container volumes need."
         echo
-        read -rp "  index: " idx
+        read -rp "      index: " idx
         [[ "$idx" =~ ^[0-9]+$ && -n "${candidates[$idx]:-}" ]] || die "invalid selection"
 
         dev="/dev/$(echo "${candidates[$idx]}" | awk '{print $1}')"

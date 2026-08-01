@@ -13,31 +13,33 @@ if [[ "$(current_role)" == "baseline" ]]; then
 fi
 echo main > "$ROLE_FILE"
 
-log "raspi-homelab provisioning"
-echo "    storage and the baseline first; everything else on top"
+header "raspi-homelab provisioning"
+log "storage and the baseline first; everything else on top"
 echo
 
-# Before the modules, so homelab-status is on PATH to diagnose whichever one
-# fails. They are symlinks into the repo, so they cost nothing and need no
-# reinstalling when the repo is updated.
-log "installing helper commands"
+header "installing helper commands"
 for helper in "$REPO_DIR"/bin/*; do
     [[ -f "$helper" ]] || continue
     name=$(basename "$helper")
-    ln -sfn "$helper" "/usr/local/sbin/$name"
-    ok "$name -> /usr/local/sbin/$name"
+    link="/usr/local/sbin/$name"
+    if [[ "$(readlink "$link")" == "$helper" ]]; then
+        skip "$name -> $link"
+        continue
+    fi
+    ln -sfn "$helper" "$link"
+    ok "$name -> $link"
 done
 echo
 
 for module in "$REPO_DIR"/modules/*.sh; do
     [[ -e "$module" ]] || continue
     name=$(basename "$module")
-    log "$name"
+    header "$name"
     REPO_DIR="$REPO_DIR" bash "$module"
     echo
 done
 
 ok "done"
 echo
-echo "  homelab-reset        wipe this system back to the pristine baseline"
-echo "  homelab-status       show partition + baseline state"
+log "homelab-reset        wipe this system back to the pristine baseline"
+log "homelab-status       show partition + baseline state"

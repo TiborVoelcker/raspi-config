@@ -60,32 +60,30 @@ else
     (( boot_b_start > root_a_end )) \
         && grows_to="  ->  $(human $(( boot_b_start - root_a_start )))"
 
-    echo "    disk        $DISK  ($(human "$disk_sectors"))"
-    echo "    bootA (p1)  $(human "$boot_sectors")"
-    echo "    rootA (p2)  $(human "$root_sectors")$grows_to"
-    echo "    bootB (p3)  $(human "$boot_sectors")"
-    echo "    rootB (p4)  $(human "$root_sectors")"
+    log "disk        $DISK  ($(human "$disk_sectors"))"
+    log "bootA (p1)  $(human "$boot_sectors")"
+    log "rootA (p2)  $(human "$root_sectors")$grows_to"
+    log "bootB (p3)  $(human "$boot_sectors")"
+    log "rootB (p4)  $(human "$root_sectors")"
     echo
 
     if (( boot_b_start <= root_a_end )); then
         warn "not enough unallocated space"
-        cat <<EOF
-
-  Almost certainly the root filesystem was auto-expanded to fill the card on
-  first boot, and a mounted ext4 filesystem cannot be shrunk. Re-image, and
-  BEFORE the first boot delete this token from cmdline.txt on the small FAT
-  partition (leave the rest of the line alone):
-
-      resize
-
-  Then boot and re-run install.sh. See USAGE.md, "Before first boot".
-
-EOF
+        echo
+        log 'Almost certainly the root filesystem was auto-expanded to fill the'
+        log 'card on first boot, and a mounted ext4 filesystem cannot be shrunk.'
+        log 'Re-image, and BEFORE the first boot delete this token from'
+        log 'cmdline.txt on the small FAT partition (leave the rest alone):'
+        echo
+        log '    resize'
+        echo
+        log 'Then boot and re-run install.sh. See USAGE.md, "Before first boot".'
+        echo
         die "aborting before touching the partition table"
     fi
 
     warn "about to write the partition table on $DISK"
-    confirm "    proceed?" || die "cancelled"
+    confirm "      proceed?" || die "cancelled"
 
     # type=c is W95 FAT32 (LBA), matching the stock Pi boot partition.
     # type=83 is Linux.

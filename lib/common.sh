@@ -6,11 +6,12 @@ set -euo pipefail
 
 # ---------- output ----------
 _c() { printf '\033[%sm%s\033[0m\n' "$1" "$2"; }
-log()  { _c '1;34' "==> $*"; }
-ok()   { _c '1;32' "  ok  $*"; }
-skip() { _c '0;90' "  --  $*"; }
-warn() { _c '1;33' "  !!  $*" >&2; }
-die()  { _c '1;31' "  XX  $*" >&2; exit 1; }
+header() { _c '1;34' "==> $*"; }
+ok()     { _c '1;32' "  ok  $*"; }
+skip()   { _c '0;90' "  --  $*"; }
+warn()   { _c '1;33' "  !!  $*" >&2; }
+die()    { _c '1;31' "  XX  $*" >&2; exit 1; }
+log()    { printf '      %s\n' "$*"; }
 
 confirm() {
     [[ "${HOMELAB_ASSUME_YES:-0}" == "1" ]] && return 0

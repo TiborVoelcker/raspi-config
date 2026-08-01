@@ -31,15 +31,15 @@ LOG="$BOOT_DIR/homelab-reset.log"
 # attempt to look at.
 [[ -f "$LOG" ]] && mv -f "$LOG" "$LOG.prev"
 exec > >(tee "$LOG") 2>&1
-echo "=== homelab-reset-main $(date -Is) ==="
+header "homelab-reset-main $(date -Is)"
 
 need_root
-[[ "$(current_role)" == "baseline" ]] || { echo "not the baseline system - refusing"; exit 0; }
-booted_via_tryboot || { echo "not a tryboot boot - refusing"; exit 0; }
-[[ -f "$ARM_MARKER" ]] || { echo "no reset armed - leaving the live system alone"; exit 0; }
+[[ "$(current_role)" == "baseline" ]] || { log "not the baseline system - refusing"; exit 0; }
+booted_via_tryboot || { log "not a tryboot boot - refusing"; exit 0; }
+[[ -f "$ARM_MARKER" ]] || { log "no reset armed - leaving the live system alone"; exit 0; }
 
 detect_disk
-echo "resetting rootfs -> $DEV_ROOT_A and boot -> $DEV_BOOT_A"
+log "resetting rootfs -> $DEV_ROOT_A and boot -> $DEV_BOOT_A"
 
 mkdir -p "$MAIN_ROOT_MNT" "$MAIN_BOOT_MNT"
 mountpoint -q "$MAIN_ROOT_MNT" || mount "$DEV_ROOT_A" "$MAIN_ROOT_MNT"
@@ -77,7 +77,7 @@ umount "$MAIN_ROOT_MNT"
 
 rm -f "$ARM_MARKER"
 sync
-echo "reset complete - rebooting. Re-run install.sh to rebuild the homelab."
+ok "reset complete - rebooting. Re-run install.sh to rebuild the homelab."
 sleep 2
 # --no-block: we are the job systemd would otherwise wait on.
 systemctl --no-block reboot

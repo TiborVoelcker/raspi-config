@@ -27,12 +27,12 @@ if days=$(age_days "$stamp"); then
 fi
 
 warn "This ERASES the live system and restores from the baseline image."
-echo "    baseline captured: $stamp$age"
-echo "    preserved:         $DATA_DIR (separate disk)"
-echo "    lost:              every package, service and change since"
+log "baseline captured: $stamp$age"
+log "preserved:         $DATA_DIR (separate disk)"
+log "lost:              every package, service and change since"
 echo
-echo "    Equivalent to re-flashing the card. Re-run install.sh afterwards"
-echo "    to rebuild the homelab."
+log "Equivalent to re-flashing the card. Re-run install.sh afterwards"
+log "to rebuild the homelab."
 echo
 confirm "Type y to reset" || die "cancelled"
 
