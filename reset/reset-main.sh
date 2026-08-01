@@ -54,7 +54,8 @@ make_runtime_dirs "$MAIN_ROOT_MNT"
 # autoboot.txt is preserved: it lives only on bootA and drives the whole
 # mechanism. Overwriting it with a bootB copy would break the next reset.
 rsync -a --delete \
-    --exclude=autoboot.txt --exclude="$ARM_NAME" --exclude='homelab-reset.log*' \
+    --exclude=autoboot.txt --exclude="$ARM_NAME" \
+    --exclude='homelab-reset.log*' \
     "$BOOT_DIR/" "$MAIN_BOOT_MNT/"
 
 # ---- point the freshly written system back at p1/p2 ----
