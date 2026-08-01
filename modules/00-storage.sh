@@ -4,7 +4,7 @@
 #
 # New partitions can be added while others are mounted. A mounted ext4 root
 # cannot be shrunk, which is why this hard-fails if Raspberry Pi OS already
-# auto-expanded p2 to fill the card. See README "Before first boot".
+# auto-expanded p2 to fill the card. See USAGE.md, "Before first boot".
 set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"
 
@@ -66,7 +66,15 @@ EOF
 
     # type=c is W95 FAT32 (LBA), matching the stock Pi boot partition.
     # type=83 is Linux. Empty start = next free, 1MiB aligned by default.
-    sfdisk --append "$DISK" <<EOF
+    #
+    # --no-reread: p1/p2 are mounted - we are running from p2 - so sfdisk's
+    #   "is anyone using this disk" check fails and it refuses. Appending into
+    #   free space leaves the existing partitions untouched, and partx below
+    #   tells the kernel about the new ones without a full re-read.
+    # -W always: wipe any filesystem signature left in the tail of the card by
+    #   a previous image. Otherwise sfdisk stops to ask whether to remove it,
+    #   and reads the answer from the heredoc feeding it.
+    sfdisk --no-reread -W always --append "$DISK" <<EOF
 size=${boot_sectors}, type=c
 size=${root_sectors}, type=83
 EOF
