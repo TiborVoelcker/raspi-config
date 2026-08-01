@@ -75,7 +75,7 @@ else
     log "capturing baseline to rootB - this takes a few minutes"
     # --delete so a recapture onto a used rootB leaves the flashed system and
     # nothing else. On a first capture rootB is empty and it does nothing.
-    rsync -aAXH --delete --info=progress2 "${RSYNC_EXCLUDES[@]}" / "$BASELINE_ROOT_MNT/"
+    rsync_live -aAXH --delete --info=progress2 "${RSYNC_EXCLUDES[@]}" / "$BASELINE_ROOT_MNT/"
     make_runtime_dirs "$BASELINE_ROOT_MNT"
 
     # Point the clone at ITS OWN partitions. If it mounted bootA instead, a

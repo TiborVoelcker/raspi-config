@@ -131,6 +131,21 @@ RSYNC_EXCLUDES=(
     --exclude=/var/swap
 )
 
+# Copy a running system. rsync exits 24 when files disappear between building
+# the file list and transferring them, which is routine here: both callers copy
+# a rootfs that is currently booted, and NetworkManager rewrites its netplan
+# files while we work. The transfer itself is complete, so 24 is reported and
+# accepted. Any other non-zero status is a real failure.
+rsync_live() {
+    local rc=0
+    rsync "$@" || rc=$?
+    if (( rc == 24 )); then
+        warn "some files vanished while copying - normal on a running system"
+    elif (( rc != 0 )); then
+        die "rsync failed (exit $rc)"
+    fi
+}
+
 # Recreate the mount points whose contents RSYNC_EXCLUDES skipped.
 make_runtime_dirs() {
     local root="$1" d
