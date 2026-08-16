@@ -114,9 +114,18 @@ services:
     network_mode: host
     cap_add:
       - NET_ADMIN
+    # Long syntax, because the short host:container:perms form is split on
+    # colons and a by-id name embeds the radio's MAC, which has six of its own.
+    # permissions is spelled out: the short form defaults it to rwm, the long
+    # form has no default at all and would hand the container a device it is
+    # not allowed to read.
     devices:
-      - $rcp:/dev/ttyACM0
-      - /dev/net/tun:/dev/net/tun
+      - source: $rcp
+        target: /dev/ttyACM0
+        permissions: rwm
+      - source: /dev/net/tun
+        target: /dev/net/tun
+        permissions: rwm
     # Holds thread/, and with it the network key and PAN id. Lose this and
     # every Thread device has to be commissioned onto a new network again.
     volumes:
