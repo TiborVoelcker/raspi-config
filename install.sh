@@ -14,7 +14,6 @@ fi
 echo main > "$ROLE_FILE"
 
 header "raspi-homelab provisioning"
-log "storage and the baseline first; everything else on top"
 echo
 
 header "installing helper commands"
