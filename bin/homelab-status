@@ -35,7 +35,7 @@ else
         elif days=$(age_days "$stamp"); then
             echo "baseline        $stamp  ($(human_age "$days"))"
             (( days > BASELINE_STALE_DAYS )) \
-                && warn "baseline is old - recapture it or reflash the card (see USAGE.md)"
+                && warn "baseline is old - recapture it or reflash the card (see README.md)"
         else
             echo "baseline        $stamp"
         fi

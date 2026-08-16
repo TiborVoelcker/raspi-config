@@ -3,7 +3,7 @@
 Context for whoever (human or AI) picks this repo up next. Keep it reflecting
 current reality, not the day it was written. Each script's own header comment
 explains what that script does; this file covers what you cannot see from
-inside a single file.
+inside a single file. `README.md` is the setup and day-to-day guide.
 
 ## What we're trying to achieve
 
@@ -40,8 +40,8 @@ disk**, so a reset never touches it.
 ## The baseline
 
 A copy of the system **exactly as it came off the SD card image**, captured
-once by `01-create-baseline.sh` before any other module runs, then left alone. No
-`/data` mount, no apt upgrade, no Docker, no services. Because it is never
+once by `01-create-baseline.sh` before any other module runs, then left alone.
+No `/data` mount, no apt upgrade, no Docker, no services. Because it is never
 refreshed it cannot drift, and cannot accumulate whatever you are resetting to
 escape.
 
@@ -52,7 +52,7 @@ Worth knowing:
   live in `install.sh` or on `/data`.
 - The baseline ages: it is never apt-upgraded. `03-upgrade.sh` runs on every
   `install.sh`, so the system you land on is current regardless. After a Debian
-  major release upgrade, recapture it - see `USAGE.md`.
+  major release upgrade, recapture it - see `README.md`.
 - It is booted only to run the reset. To look at it or change it, mount `p4`
   from the live system.
 
@@ -78,7 +78,7 @@ kernel, overlays or cmdline.
 `p3`/`p4` are carved from unallocated space at the end of the card, which is
 why the card must **not** auto-expand `p2` on first boot - a mounted ext4
 filesystem cannot be shrunk, so this has to be handled before the first boot,
-not fixed up after. See `USAGE.md`, "Before first boot".
+not fixed up after. See `README.md`, "Before first boot".
 
 ### tryboot / autoboot.txt
 
@@ -122,15 +122,29 @@ be bootable.
 | `reset/reset-main.sh` | Installed into the baseline as `/usr/local/sbin/homelab-reset-main`. Overwrites `p1`/`p2` with itself, behind three gates. |
 | `reset/homelab-reset-main.service` | Runs `reset-main.sh` at boot on the baseline. |
 
-**Module numbering is load-bearing.** `01-create-baseline.sh` captures the baseline, so
-everything numbered after it is by definition absent from that baseline. A new
-module that must survive a reset does not exist - put its state on `/data`
-instead.
+**Module numbering is load-bearing.** `01-create-baseline.sh` captures the
+baseline, so everything numbered after it is by definition absent from that
+baseline. A new module that must survive a reset does not exist - put its state
+on `/data` instead.
+
+### Reset gates
+
+`homelab-reset-main` runs on every baseline boot and refuses to do anything
+unless all three hold:
+
+1. `/etc/homelab-role` says `baseline` - we are not the live system
+2. this boot came via tryboot - it was deliberate
+3. the arm marker exists on bootB - a reset was actually requested
+
+`homelab-reset` sets up all three. The marker lives on **bootB**, not bootA:
+each system mounts its own boot partition, so a marker on bootA would be
+invisible to the baseline, and `arm_reset()` in `lib/common.sh` mounts bootB
+explicitly to place it.
 
 ### The capture/reset pair
 
-`01-create-baseline.sh` makes three changes to the clone: retarget its fstab at p3/p4,
-write `baseline` to the role file, and install the reset machinery.
+`01-create-baseline.sh` makes three changes to the clone: retarget its fstab at
+p3/p4, write `baseline` to the role file, and install the reset machinery.
 `reset/reset-main.sh` undoes exactly those on the way back, plus the cmdline.
 **Change one and check the other** - an edit with no inverse is silently
 inherited by the live system after a reset.
@@ -140,9 +154,8 @@ flashed card, which is why it is worth keeping short.
 
 ## Current status
 
-Everything above is implemented. Nothing has been exercised on real hardware
-yet; `USAGE.md`'s "Test order" is the sequence to do that with, and step 3 is
-the one that must not be skipped.
+Everything above is implemented, and the full cycle - install, reset, reinstall
+- has been exercised on real hardware.
 
 ## Things to watch for when extending this
 

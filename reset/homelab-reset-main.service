@@ -1,8 +1,7 @@
 [Unit]
 Description=Reset the live system to the pristine baseline, if armed
-# The arm marker lives on this system's own boot partition (bootB). Checking it
-# here is only a cheap first pass; reset-main.sh re-checks it along with the role
-# and tryboot gates.
+# A cheap first pass on the arm marker, which lives on this system's own boot
+# partition (bootB). reset-main.sh re-checks it along with the other gates.
 After=local-fs.target
 ConditionPathExists=/boot/firmware/homelab-reset.arm
 

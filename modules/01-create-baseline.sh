@@ -4,9 +4,6 @@
 #
 # Runs FIRST, before any module that changes the system, so the baseline is the
 # pristine flashed OS - no /data mount, no apt upgrade, no Docker, no services.
-# Restoring it is meant to be equivalent to re-flashing the card, after which
-# install.sh rebuilds everything on top.
-#
 # Captured exactly once. The baseline only ever boots, overwrites the main
 # image and reboots, so nothing here goes further than making it bootable.
 #
@@ -14,14 +11,9 @@
 #       [all]     tryboot_a_b=1   boot_partition=1   -> normal boot, bootA
 #       [tryboot]                 boot_partition=3   -> baseline boot, bootB
 #
-# tryboot_a_b=1 tells the firmware to read the ordinary config.txt from
-# whichever partition it landed on, rather than looking for a tryboot.txt. That
-# makes the switch happen at the PARTITION level: kernel, device trees,
-# overlays and cmdline all come from bootB, so the baseline shares nothing with
-# the live system and cannot be disturbed by a kernel upgrade on it.
-#
-# The tryboot flag is one-shot and cannot be set by a cold boot, so any
-# ordinary reboot - or a power cut - lands back on bootA with no action needed.
+# tryboot_a_b=1 makes the firmware read the ordinary config.txt from whichever
+# partition it landed on, so kernel, overlays and cmdline all come from bootB.
+# See AGENTS.md for why the switch happens at the partition level.
 set -euo pipefail
 source "${REPO_DIR:?}/lib/common.sh"
 
@@ -40,8 +32,8 @@ if [[ -f "$BASELINE_BOOT_MNT/config.txt" ]]; then
     skip "bootB already populated"
 else
     log "copying boot partition to bootB"
-    # autoboot.txt is deliberately excluded: it is only ever read from the
-    # first FAT partition, and a stale copy here would only cause confusion.
+    # autoboot.txt is excluded: it is only ever read from the first FAT
+    # partition, and a stale copy here would only cause confusion.
     rsync -a --exclude=autoboot.txt --exclude="$ARM_NAME" \
         --exclude='homelab-reset.log*' \
         "$BOOT_DIR/" "$BASELINE_BOOT_MNT/"
@@ -79,8 +71,7 @@ else
     make_runtime_dirs "$BASELINE_ROOT_MNT"
 
     # Point the clone at ITS OWN partitions. If it mounted bootA instead, a
-    # kernel upgrade there would overwrite the live system's kernel and
-    # reintroduce exactly the coupling this layout removes.
+    # kernel upgrade there would overwrite the live system's kernel.
     retarget_fstab "$BASELINE_ROOT_MNT/etc/fstab" "$PART_BOOT_B" "$PART_ROOT_B"
 
     date -Is > "$BASELINE_ROOT_MNT$BASELINE_STAMP"

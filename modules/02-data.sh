@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # Mount the external USB disk at /data, and make Docker refuse to start without
-# it.
-#
-# The hazard: if the disk is absent but Docker starts anyway, bind mounts
-# CREATE empty directories under /data. Paperless then sees no database,
-# concludes it is a fresh install, and initialises one on the SD card while the
-# real data sits untouched on the unmounted disk. Three layers stop that:
+# it. If the disk is absent but Docker starts anyway, bind mounts CREATE empty
+# directories under /data and services initialise fresh state onto the SD card
+# while the real data sits on the unmounted disk. Three layers stop that:
 #   nofail            -> the Pi still boots without the disk, so you can SSH in
 #   RequiresMountsFor -> Docker will not start until /data is genuinely mounted
 #   marker file       -> catches "mounted, but it is the wrong disk"
