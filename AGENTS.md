@@ -116,7 +116,8 @@ be bootable.
 | `modules/03-upgrade.sh` | `apt-get update && upgrade`. |
 | `modules/11-docker.sh` | Docker Engine + Compose plugin from Debian's repos. |
 | `modules/12-claude-code.sh` | Claude Code, installed into `$SUDO_USER`'s home. |
-| `modules/20-paperless.sh` | The only service module so far, and the template for the rest. |
+| `modules/20-paperless.sh` | Paperless-ngx, and the template the other service modules follow. |
+| `modules/21-home-assistant.sh` | Home Assistant Container - host networking, config on `/data`. |
 | `bin/homelab-reset` | Arms the reset and triggers a tryboot. |
 | `bin/homelab-status` | Read-only snapshot: role, tryboot, partitions, `/data`, baseline age, armed? |
 | `reset/reset-main.sh` | Installed into the baseline as `/usr/local/sbin/homelab-reset-main`. Overwrites `p1`/`p2` with itself, behind three gates. |
